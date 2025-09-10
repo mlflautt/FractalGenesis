@@ -11,12 +11,12 @@ scikit-learn>=1.0.0
 opencv-python>=4.5.0
 
 # GUI Frameworks
-tkinter-dev  # Usually comes with Python
+# tkinter comes with Python
 PyQt5>=5.15.0
 customtkinter>=5.0.0
 
 # Database
-sqlite3  # Usually comes with Python
+# sqlite3 comes with Python
 sqlalchemy>=1.4.0
 
 # Image Processing & Computer Vision

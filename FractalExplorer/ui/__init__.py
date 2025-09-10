@@ -6,6 +6,5 @@ including the 4-option selection interface for fractal rating.
 """
 
 from .selection_interface import SelectionInterface
-from .rating_window import RatingWindow
 
-__all__ = ['SelectionInterface', 'RatingWindow']
+__all__ = ['SelectionInterface']

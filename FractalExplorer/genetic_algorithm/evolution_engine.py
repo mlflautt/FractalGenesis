@@ -33,7 +33,7 @@ class EvolutionConfig:
     max_generations: int = 100
     convergence_threshold: float = 0.01  # Stop if population converges
     user_selection_batch_size: int = 4  # How many options to show user
-    
+
 
 class EvolutionEngine:
     """
@@ -124,4 +124,230 @@ class EvolutionEngine:
         self.stats['generation_times'].append(generation_stats['time_elapsed'])
         self.stats['diversity_scores'].append(generation_stats['diversity'])
         
-        logger.info(f\"Generation {self.current_generation} complete: \"\n                   f\"diversity={generation_stats['diversity']:.3f}, \"\n                   f\"time={generation_stats['time_elapsed']:.2f}s\")\n        \n        # Call generation complete callback\n        if self.on_generation_complete:\n            self.on_generation_complete(self.current_generation, generation_stats)\n        \n        return generation_stats\n    \n    def _select_parents(self) -> List[FractalGenome]:\n        \"\"\"Select parents for reproduction based on fitness and diversity.\"\"\"\n        # Get fitness scores (from user selections + AI predictions)\n        fitness_scores = [genome.fitness or 0.0 for genome in self.population.individuals]\n        \n        # Calculate diversity scores\n        diversity_scores = self._calculate_diversity_scores()\n        \n        # Combine fitness and diversity with weighting\n        combined_scores = []\n        for i in range(len(self.population.individuals)):\n            fitness = fitness_scores[i]\n            diversity = diversity_scores[i]\n            combined = (1 - self.config.diversity_weight) * fitness + self.config.diversity_weight * diversity\n            combined_scores.append(combined)\n        \n        # Select parents using tournament selection\n        num_parents = self.config.population_size - self.config.elite_size\n        parents = []\n        \n        for _ in range(num_parents):\n            parent = self.selection_strategy.select(self.population.individuals, combined_scores)\n            parents.append(parent)\n        \n        return parents\n    \n    def _create_offspring(self, parents: List[FractalGenome]) -> List[FractalGenome]:\n        \"\"\"Create offspring through crossover and mutation.\"\"\"\n        offspring = []\n        \n        # Create pairs of parents for crossover\n        for i in range(0, len(parents), 2):\n            parent1 = parents[i]\n            parent2 = parents[(i + 1) % len(parents)]  # Wrap around if odd number\n            \n            if random.random() < self.config.crossover_rate:\n                # Perform crossover\n                child1 = parent1.crossover(parent2)\n                child2 = parent2.crossover(parent1)\n            else:\n                # Copy parents directly\n                child1 = parent1.copy()\n                child2 = parent2.copy()\n            \n            # Apply mutation\n            if random.random() < self.config.mutation_rate:\n                child1.mutate(self.config.mutation_rate, self.config.mutation_strength)\n            \n            if random.random() < self.config.mutation_rate:\n                child2.mutate(self.config.mutation_rate, self.config.mutation_strength)\n            \n            offspring.extend([child1, child2])\n        \n        return offspring\n    \n    def _create_next_generation(self, offspring: List[FractalGenome]) -> List[FractalGenome]:\n        \"\"\"Create the next generation using elitism and offspring.\"\"\"\n        # Sort current population by fitness\n        current_sorted = sorted(self.population.individuals, \n                               key=lambda g: g.fitness or 0.0, reverse=True)\n        \n        # Select elite individuals\n        elite = current_sorted[:self.config.elite_size]\n        \n        # Select best offspring to fill remaining spots\n        remaining_spots = self.config.population_size - self.config.elite_size\n        selected_offspring = offspring[:remaining_spots]\n        \n        # Combine elite and offspring\n        next_generation = elite + selected_offspring\n        \n        return next_generation\n    \n    def _calculate_diversity_scores(self) -> List[float]:\n        \"\"\"Calculate diversity scores for all individuals in population.\"\"\"\n        diversity_scores = []\n        \n        for i, individual in enumerate(self.population.individuals):\n            # Calculate average distance to all other individuals\n            total_distance = 0.0\n            for j, other in enumerate(self.population.individuals):\n                if i != j:\n                    total_distance += individual.calculate_diversity(other)\n            \n            avg_distance = total_distance / (len(self.population.individuals) - 1)\n            diversity_scores.append(avg_distance)\n        \n        return diversity_scores\n    \n    def _calculate_generation_stats(self, old_population: List[FractalGenome]) -> Dict[str, Any]:\n        \"\"\"Calculate statistics for the current generation.\"\"\"\n        fitness_values = [g.fitness or 0.0 for g in self.population.individuals]\n        diversity_scores = self._calculate_diversity_scores()\n        \n        stats = {\n            'avg_fitness': np.mean(fitness_values),\n            'max_fitness': np.max(fitness_values),\n            'min_fitness': np.min(fitness_values),\n            'fitness_std': np.std(fitness_values),\n            'diversity': np.mean(diversity_scores),\n            'diversity_std': np.std(diversity_scores),\n            'population_size': len(self.population.individuals),\n            'unique_genomes': len(set(g.genome_id for g in self.population.individuals))\n        }\n        \n        return stats\n    \n    def get_candidates_for_user_selection(self, count: int = 4) -> List[FractalGenome]:\n        \"\"\"\n        Get candidate genomes for user selection.\n        \n        Selects a diverse set of individuals from the population,\n        balancing between high fitness and high diversity.\n        \n        Args:\n            count: Number of candidates to return\n            \n        Returns:\n            List of candidate genomes\n        \"\"\"\n        if len(self.population.individuals) < count:\n            return self.population.individuals.copy()\n        \n        candidates = []\n        remaining = self.population.individuals.copy()\n        \n        # First, select the highest fitness individual\n        if remaining:\n            best = max(remaining, key=lambda g: g.fitness or 0.0)\n            candidates.append(best)\n            remaining.remove(best)\n        \n        # Then select individuals that maximize diversity from already selected\n        while len(candidates) < count and remaining:\n            best_candidate = None\n            best_diversity = -1\n            \n            for candidate in remaining:\n                # Calculate minimum distance to already selected candidates\n                min_distance = min(candidate.calculate_diversity(selected) \n                                 for selected in candidates)\n                \n                if min_distance > best_diversity:\n                    best_diversity = min_distance\n                    best_candidate = candidate\n            \n            if best_candidate:\n                candidates.append(best_candidate)\n                remaining.remove(best_candidate)\n            else:\n                # Fallback: just take next available\n                candidates.append(remaining[0])\n                remaining.pop(0)\n        \n        return candidates\n    \n    def record_user_selection(self, candidates: List[FractalGenome], selected_index: int):\n        \"\"\"\n        Record a user selection for fitness evaluation.\n        \n        Args:\n            candidates: List of candidate genomes that were presented\n            selected_index: Index of selected genome (or -1 for skip)\n        \"\"\"\n        candidate_ids = [g.genome_id for g in candidates]\n        self.user_preferences.append((candidate_ids, selected_index))\n        self.stats['total_user_selections'] += 1\n        \n        # Update fitness based on selection\n        if 0 <= selected_index < len(candidates):\n            selected_genome = candidates[selected_index]\n            \n            # Increase fitness for selected genome\n            current_fitness = selected_genome.fitness or 0.0\n            selected_genome.fitness = current_fitness + 1.0\n            \n            # Slightly decrease fitness for non-selected candidates\n            for i, candidate in enumerate(candidates):\n                if i != selected_index:\n                    current_fitness = candidate.fitness or 0.0\n                    candidate.fitness = max(0.0, current_fitness - 0.1)\n        \n        logger.info(f\"Recorded user selection: {selected_index} out of {len(candidates)} candidates\")\n    \n    def run_evolution_cycle(self) -> bool:\n        \"\"\"\n        Run one complete evolution cycle (generation + user selection).\n        \n        Returns:\n            True if evolution should continue, False if stopping criteria met\n        \"\"\"\n        # Evolve one generation\n        gen_stats = self.evolve_generation()\n        \n        # Check stopping criteria\n        if self.current_generation >= self.config.max_generations:\n            logger.info(f\"Reached maximum generations ({self.config.max_generations})\")\n            return False\n        \n        if gen_stats['diversity'] < self.config.convergence_threshold:\n            logger.info(f\"Population converged (diversity={gen_stats['diversity']:.4f})\")\n            return False\n        \n        # Get candidates for user selection\n        candidates = self.get_candidates_for_user_selection()\n        \n        # Request user selection\n        if self.on_user_selection_needed:\n            selected_index = self.on_user_selection_needed(candidates)\n            self.record_user_selection(candidates, selected_index)\n        \n        return True\n    \n    def get_best_genomes(self, count: int = 5) -> List[FractalGenome]:\n        \"\"\"\n        Get the best genomes from current population.\n        \n        Args:\n            count: Number of top genomes to return\n            \n        Returns:\n            List of best genomes sorted by fitness\n        \"\"\"\n        sorted_population = sorted(self.population.individuals, \n                                 key=lambda g: g.fitness or 0.0, reverse=True)\n        return sorted_population[:count]\n    \n    def get_evolution_summary(self) -> Dict[str, Any]:\n        \"\"\"\n        Get a summary of the evolution process.\n        \n        Returns:\n            Dictionary with evolution statistics and history\n        \"\"\"\n        return {\n            'current_generation': self.current_generation,\n            'total_user_selections': self.stats['total_user_selections'],\n            'evolution_history': self.evolution_history,\n            'best_genomes': [g.to_dict() for g in self.get_best_genomes(3)],\n            'population_diversity': np.mean(self._calculate_diversity_scores()) if self.population.individuals else 0.0,\n            'config': {\n                'population_size': self.config.population_size,\n                'mutation_rate': self.config.mutation_rate,\n                'crossover_rate': self.config.crossover_rate\n            }\n        }"
+        logger.info(f"Generation {self.current_generation} complete: "
+                   f"diversity={generation_stats['diversity']:.3f}, "
+                   f"time={generation_stats['time_elapsed']:.2f}s")
+        
+        # Call generation complete callback
+        if self.on_generation_complete:
+            self.on_generation_complete(self.current_generation, generation_stats)
+        
+        return generation_stats
+    
+    def _select_parents(self) -> List[FractalGenome]:
+        """Select parents for reproduction based on fitness and diversity."""
+        # Get fitness scores (from user selections + AI predictions)
+        fitness_scores = [genome.fitness or 0.0 for genome in self.population.individuals]
+        
+        # Calculate diversity scores
+        diversity_scores = self._calculate_diversity_scores()
+        
+        # Combine fitness and diversity with weighting
+        combined_scores = []
+        for i in range(len(self.population.individuals)):
+            fitness = fitness_scores[i]
+            diversity = diversity_scores[i]
+            combined = (1 - self.config.diversity_weight) * fitness + self.config.diversity_weight * diversity
+            combined_scores.append(combined)
+        
+        # Select parents using tournament selection
+        num_parents = self.config.population_size - self.config.elite_size
+        parents = []
+        
+        for _ in range(num_parents):
+            parent = self.selection_strategy.select(self.population.individuals, combined_scores)
+            parents.append(parent)
+        
+        return parents
+    
+    def _create_offspring(self, parents: List[FractalGenome]) -> List[FractalGenome]:
+        """Create offspring through crossover and mutation."""
+        offspring = []
+        
+        # Create pairs of parents for crossover
+        for i in range(0, len(parents), 2):
+            parent1 = parents[i]
+            parent2 = parents[(i + 1) % len(parents)]  # Wrap around if odd number
+            
+            if random.random() < self.config.crossover_rate:
+                # Perform crossover
+                child1 = parent1.crossover(parent2)
+                child2 = parent2.crossover(parent1)
+            else:
+                # Copy parents directly
+                child1 = parent1.copy()
+                child2 = parent2.copy()
+            
+            # Apply mutation
+            if random.random() < self.config.mutation_rate:
+                child1.mutate(self.config.mutation_rate, self.config.mutation_strength)
+            
+            if random.random() < self.config.mutation_rate:
+                child2.mutate(self.config.mutation_rate, self.config.mutation_strength)
+            
+            offspring.extend([child1, child2])
+        
+        return offspring
+    
+    def _create_next_generation(self, offspring: List[FractalGenome]) -> List[FractalGenome]:
+        """Create the next generation using elitism and offspring."""
+        # Sort current population by fitness
+        current_sorted = sorted(self.population.individuals, 
+                               key=lambda g: g.fitness or 0.0, reverse=True)
+        
+        # Select elite individuals
+        elite = current_sorted[:self.config.elite_size]
+        
+        # Select best offspring to fill remaining spots
+        remaining_spots = self.config.population_size - self.config.elite_size
+        selected_offspring = offspring[:remaining_spots]
+        
+        # Combine elite and offspring
+        next_generation = elite + selected_offspring
+        
+        return next_generation
+    
+    def _calculate_diversity_scores(self) -> List[float]:
+        """Calculate diversity scores for all individuals in population."""
+        diversity_scores = []
+        
+        for i, individual in enumerate(self.population.individuals):
+            # Calculate average distance to all other individuals
+            total_distance = 0.0
+            for j, other in enumerate(self.population.individuals):
+                if i != j:
+                    total_distance += individual.calculate_diversity(other)
+            
+            avg_distance = total_distance / (len(self.population.individuals) - 1)
+            diversity_scores.append(avg_distance)
+        
+        return diversity_scores
+    
+    def _calculate_generation_stats(self, old_population: List[FractalGenome]) -> Dict[str, Any]:
+        """Calculate statistics for the current generation."""
+        fitness_values = [g.fitness or 0.0 for g in self.population.individuals]
+        diversity_scores = self._calculate_diversity_scores()
+        
+        stats = {
+            'avg_fitness': np.mean(fitness_values),
+            'max_fitness': np.max(fitness_values),
+            'min_fitness': np.min(fitness_values),
+            'fitness_std': np.std(fitness_values),
+            'diversity': np.mean(diversity_scores),
+            'diversity_std': np.std(diversity_scores),
+            'population_size': len(self.population.individuals),
+            'unique_genomes': len(set(g.genome_id for g in self.population.individuals))
+        }
+        
+        return stats
+    
+    def get_candidates_for_user_selection(self, count: int = 4) -> List[FractalGenome]:
+        """
+        Get candidate genomes for user selection.
+        
+        Selects a diverse set of individuals from the population,
+        balancing between high fitness and high diversity.
+        
+        Args:
+            count: Number of candidates to return
+            
+        Returns:
+            List of candidate genomes
+        """
+        if len(self.population.individuals) < count:
+            return self.population.individuals.copy()
+        
+        candidates = []
+        remaining = self.population.individuals.copy()
+        
+        # First, select the highest fitness individual
+        if remaining:
+            best = max(remaining, key=lambda g: g.fitness or 0.0)
+            candidates.append(best)
+            remaining.remove(best)
+        
+        # Then select individuals that maximize diversity from already selected
+        while len(candidates) < count and remaining:
+            best_candidate = None
+            best_diversity = -1
+            
+            for candidate in remaining:
+                # Calculate minimum distance to already selected candidates
+                min_distance = min(candidate.calculate_diversity(selected) 
+                                 for selected in candidates)
+                
+                if min_distance > best_diversity:
+                    best_diversity = min_distance
+                    best_candidate = candidate
+            
+            if best_candidate:
+                candidates.append(best_candidate)
+                remaining.remove(best_candidate)
+            else:
+                # Fallback: just take next available
+                candidates.append(remaining[0])
+                remaining.pop(0)
+        
+        return candidates
+    
+    def record_user_selection(self, candidates: List[FractalGenome], selected_index: int):
+        """
+        Record a user selection for fitness evaluation.
+        
+        Args:
+            candidates: List of candidate genomes that were presented
+            selected_index: Index of selected genome (or -1 for skip)
+        """
+        candidate_ids = [g.genome_id for g in candidates]
+        self.user_preferences.append((candidate_ids, selected_index))
+        self.stats['total_user_selections'] += 1
+        
+        # Update fitness based on selection
+        if 0 <= selected_index < len(candidates):
+            selected_genome = candidates[selected_index]
+            
+            # Increase fitness for selected genome
+            current_fitness = selected_genome.fitness or 0.0
+            selected_genome.fitness = current_fitness + 1.0
+            
+            # Slightly decrease fitness for non-selected candidates
+            for i, candidate in enumerate(candidates):
+                if i != selected_index:
+                    current_fitness = candidate.fitness or 0.0
+                    candidate.fitness = max(0.0, current_fitness - 0.1)
+        
+        logger.info(f"Recorded user selection: {selected_index} out of {len(candidates)} candidates")
+    
+    def get_best_genomes(self, count: int = 5) -> List[FractalGenome]:
+        """
+        Get the best genomes from current population.
+        
+        Args:
+            count: Number of top genomes to return
+            
+        Returns:
+            List of best genomes sorted by fitness
+        """
+        sorted_population = sorted(self.population.individuals, 
+                                 key=lambda g: g.fitness or 0.0, reverse=True)
+        return sorted_population[:count]
+    
+    def get_evolution_summary(self) -> Dict[str, Any]:
+        """
+        Get a summary of the evolution process.
+        
+        Returns:
+            Dictionary with evolution statistics and history
+        """
+        return {
+            'current_generation': self.current_generation,
+            'total_user_selections': self.stats['total_user_selections'],
+            'evolution_history': self.evolution_history,
+            'best_genomes': [g.to_dict() for g in self.get_best_genomes(3)],
+            'population_diversity': np.mean(self._calculate_diversity_scores()) if self.population.individuals else 0.0,
+            'config': {
+                'population_size': self.config.population_size,
+                'mutation_rate': self.config.mutation_rate,
+                'crossover_rate': self.config.crossover_rate
+            }
+        }

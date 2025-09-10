@@ -264,7 +264,18 @@ class FractalGenome:
     
     def _generate_id(self) -> str:
         """Generate a unique ID for this genome"""
-        content = json.dumps(self.to_dict(), sort_keys=True)
+        # Create dict without genome_id to avoid circular dependency
+        data = {
+            'renderer_type': self.renderer_type.value,
+            'generation': self.generation,
+            'parent_ids': self.parent_ids,
+            'fitness': self.fitness,
+            'camera': self.camera.to_dict(),
+            'fractal': self.fractal.to_dict(),
+            'color': self.color.to_dict(),
+            'lighting': self.lighting.to_dict()
+        }
+        content = json.dumps(data, sort_keys=True)
         return hashlib.md5(content.encode()).hexdigest()[:12]
     
     def mutate(self, mutation_rate: float = 0.1, mutation_strength: float = 0.1) -> None:
