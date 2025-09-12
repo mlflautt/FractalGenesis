@@ -60,9 +60,13 @@ class FractalLauncher:
         type_frame.columnconfigure(1, weight=1)
         
         self.fractal_type = tk.StringVar(value="flam3")
-        ttk.Radiobutton(type_frame, text="Fractal Flames (Flam3) - Colorful 2D flames", 
+        ttk.Radiobutton(type_frame, text="Fractal Flames (Flam3) - Colorful 2D flames ✅", 
                        variable=self.fractal_type, value="flam3").grid(row=0, column=0, sticky=tk.W, pady=2)
-        ttk.Radiobutton(type_frame, text="3D Fractals (Mandelbulber) - 3D mathematical shapes", 
+        
+        # Mandelbulber option with dynamic status
+        mandel_text = "3D Fractals (Mandelbulber) - 3D mathematical shapes"
+        mandel_status = ""
+        ttk.Radiobutton(type_frame, text=f"{mandel_text} {mandel_status}", 
                        variable=self.fractal_type, value="mandelbulber").grid(row=1, column=0, sticky=tk.W, pady=2)
         
         # Evolution Settings
@@ -138,6 +142,11 @@ class FractalLauncher:
                                      command=self.start_evolution)
         self.start_button.pack(side=tk.LEFT, padx=5)
         
+        # Visual GUI Button  
+        self.visual_button = ttk.Button(button_frame, text="Visual Evolution GUI",
+                                      command=self.start_visual_gui)
+        self.visual_button.pack(side=tk.LEFT, padx=5)
+        
         # View Results Button
         self.view_button = ttk.Button(button_frame, text="View Results", 
                                     command=self.view_results, state=tk.DISABLED)
@@ -178,6 +187,30 @@ class FractalLauncher:
         self.status_text.see(tk.END)
         self.root.update_idletasks()
     
+    def check_mandelbulber(self):
+        """Check if Mandelbulber is available."""
+        try:
+            # Try flatpak first
+            result = subprocess.run(
+                ["flatpak", "run", "com.github.buddhi1980.mandelbulber2", "--version"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0:
+                return True
+        except:
+            pass
+        
+        try:
+            # Try system installation
+            result = subprocess.run(["mandelbulber2", "--version"], 
+                                  capture_output=True, timeout=10)
+            if result.returncode == 0:
+                return True
+        except:
+            pass
+        
+        return False
+    
     def check_dependencies(self):
         """Check if required dependencies are installed."""
         self.log_message("Checking dependencies...")
@@ -195,6 +228,13 @@ class FractalLauncher:
             self.log_message("⚠ Could not check for Flam3")
             self.flam3_available = False
         
+        # Check for Mandelbulber
+        self.mandelbulber_available = self.check_mandelbulber()
+        if self.mandelbulber_available:
+            self.log_message("✓ Mandelbulber is installed and ready")
+        else:
+            self.log_message("⚠ Mandelbulber not found. Install with: flatpak install com.github.buddhi1980.mandelbulber2")
+        
         # Check for Python dependencies
         try:
             import PIL
@@ -210,10 +250,10 @@ class FractalLauncher:
                                "Flam3 is not installed. Please install it with:\n\nsudo dnf install flam3")
             return
         
-        if self.fractal_type.get() == "mandelbulber":
-            messagebox.showinfo("Not Yet Implemented", 
-                              "Mandelbulber integration is available but not yet connected to this GUI.\n\n" +
-                              "For now, please use Fractal Flames (Flam3) which is fully working!")
+        if self.fractal_type.get() == "mandelbulber" and not self.mandelbulber_available:
+            messagebox.showerror("Missing Dependency", 
+                               "Mandelbulber is not installed. Please install it with:\n\n" +
+                               "flatpak install com.github.buddhi1980.mandelbulber2")
             return
         
         # Disable start button and show progress
@@ -293,6 +333,40 @@ class FractalLauncher:
             self.root.after(0, lambda: self.start_button.configure(state=tk.NORMAL))
             self.root.after(0, lambda: self.progress.stop())
     
+    def start_visual_gui(self):
+        """Launch the visual evolution GUI."""
+        fractal_type = self.fractal_type.get()
+        
+        # Check dependencies
+        if fractal_type == "flam3" and not self.flam3_available:
+            messagebox.showerror("Missing Dependency", 
+                               "Flam3 is not installed. Please install it with:\n\nsudo dnf install flam3")
+            return
+        
+        if fractal_type == "mandelbulber" and not self.mandelbulber_available:
+            messagebox.showerror("Missing Dependency", 
+                               "Mandelbulber is not installed. Please install it with:\n\n" +
+                               "flatpak install com.github.buddhi1980.mandelbulber2")
+            return
+        
+        try:
+            self.log_message(f"Launching Visual Evolution GUI ({fractal_type})...")
+            
+            # Launch visual GUI
+            visual_gui_path = project_root / "ui" / "visual_evolution_gui.py"
+            cmd = [sys.executable, str(visual_gui_path)]
+            
+            if fractal_type == "mandelbulber":
+                cmd.append("3d")
+            
+            subprocess.Popen(cmd)
+            self.log_message("Visual GUI launched successfully!")
+            
+        except Exception as e:
+            error_msg = f"Error launching Visual GUI: {e}"
+            self.log_message(error_msg)
+            messagebox.showerror("Error", error_msg)
+    
     def view_results(self):
         """Open the output directory to view results."""
         output_path = Path(self.output_dir.get())
@@ -312,22 +386,39 @@ class FractalLauncher:
         """Show help information."""
         help_text = """FractalGenesis Help
 
-How to use:
-1. Choose your fractal type (Fractal Flames recommended)
-2. Set evolution parameters (5 generations and 8 population work well)
-3. Choose whether to render images or simulate
-4. Click 'Start Evolution!'
-5. Wait for the process to complete
-6. Click 'View Results' to see your evolved fractals
+🚀 EVOLUTION MODES:
 
-Tips:
-• Start with simulation mode to test quickly
-• Higher quality = better images but slower rendering
-• More generations = more evolution but takes longer
-• The algorithm will show you 4 fractals each generation and simulate choosing the best one
+1. AUTOMATED EVOLUTION (Start Evolution!):
+   • Choose fractal type (Flam3 or Mandelbulber)
+   • Set parameters and click "Start Evolution!"
+   • Algorithm automatically selects best fractals
+   • Fully hands-off process
 
-For more information, visit:
-https://github.com/mlflautt/FractalGenesis"""
+2. VISUAL EVOLUTION GUI (NEW!):
+   • Click "Visual Evolution GUI" for interactive mode
+   • See generation progress in real-time
+   • Manually select your favorite fractals
+   • Visual step-by-step process with thumbnails
+   • Train AI on your preferences
+
+💡 FEATURES:
+• Fractal Flames (Flam3): Colorful 2D flame fractals ✅
+• 3D Fractals (Mandelbulber): 3D mathematical shapes ✅
+• AI Preference Learning: Train AI on your selections
+• Data Export/Import: Share your trained AI models
+
+⚙️ SETTINGS:
+• Start with 3-5 generations for testing
+• Higher quality = better images but slower
+• Simulation mode = fast testing without images
+
+🎯 TIPS:
+• Try Visual GUI for the most engaging experience
+• Use AI training to automate future selections
+• Check data/user_selections for selection history
+• Use manage_ai.py for advanced AI features
+
+For more: https://github.com/mlflautt/FractalGenesis"""
         
         messagebox.showinfo("Help", help_text)
 

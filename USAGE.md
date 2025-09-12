@@ -1,113 +1,89 @@
-# How to Use FractalGenesis
+# Usage Guide
 
-FractalGenesis lets you evolve beautiful fractals using genetic algorithms! You can use either the **simple graphical interface** or the **command line**.
+FractalGenesis provides multiple interfaces for fractal evolution: GUI, command-line, and AI training tools.
 
-## 🖥️ **Easy Way: Graphical Interface (Recommended)**
+## Quick Start
 
-### 1. Launch the GUI
+**System Check:**
 ```bash
-cd /path/to/FractalGenesis
+python3 get_started.py
+```
+
+**Basic Usage:**
+1. Launch GUI: `python3 fractal_launcher.py`
+2. Configure parameters and start evolution
+3. View results when complete
+4. Optional: Train AI on your selections
+
+## GUI Interface
+
+**Launch:**
+```bash
 python3 fractal_launcher.py
 ```
 
-### 2. Use the Interface
-- **Choose Fractal Type**: Select "Fractal Flames (Flam3)" (recommended)
-- **Set Evolution Parameters**: 
-  - Generations: 5 (how many evolution cycles)
-  - Population: 8 (how many fractals per generation)  
-- **Choose Rendering**:
-  - "Render actual images" - See beautiful results (slower)
-  - "Simulation mode" - Test quickly without rendering
-- **Set Quality/Size**: Higher = better images but slower
-- **Click "Start Evolution!"**
-- **Wait** for it to complete
-- **Click "View Results"** to see your evolved fractals!
+**Configuration:**
+- Fractal Type: "Fractal Flames (Flam3)" recommended
+- Generations: 3-10 evolution cycles
+- Population: 6-12 fractals per generation
+- Rendering: "Render images" for results, "Simulation" for testing
+- Quality/Size: Higher values = better images but slower
 
-### 3. What Happens
-The algorithm will:
-1. Generate random fractals
-2. Show you 4 options each generation  
-3. Automatically pick the "best" one (simulated user choice)
-4. Create new fractals based on the chosen one
-5. Repeat for the specified number of generations
-6. Save all the images for you to view
+**Process:**
+1. Algorithm generates random initial population
+2. Evolution runs automatically with simulated selection
+3. Results saved to output directory
+4. Click "View Results" when complete
 
-## 🔧 **Advanced Way: Command Line**
+## AI Training
 
-### Fractal Flames (Flam3)
+**Generate Training Data:**
 ```bash
-# Basic run with rendering
-python3 examples/flam3_evolution.py --render --generations 5 --population 8
-
-# Quick test without rendering  
-python3 examples/flam3_evolution.py --generations 3 --population 6
-
-# High quality rendering
-python3 examples/flam3_evolution.py --render --quality 80 --size 1024 --generations 3
+python3 generate_test_data.py
 ```
 
-### 3D Fractals (Mandelbulber - if available)
+**Train AI Model:**
 ```bash
-# Basic evolution (simulation mode)
+python3 manage_ai.py train
+```
+
+**Manage Models:**
+```bash
+# View data and models
+python3 manage_ai.py data stats
+python3 manage_ai.py selectors
+
+# Test and export models
+python3 manage_ai.py test "Model Name"
+python3 manage_ai.py export "Model Name"
+```
+
+## Command Line
+
+**Flam3 Evolution:**
+```bash
+# With rendering
+python3 examples/flam3_evolution.py --render --generations 5 --population 8
+
+# Quick test
+python3 examples/flam3_evolution.py --generations 3 --population 6
+```
+
+**3D Fractals (if Mandelbulber available):**
+```bash
 python3 examples/basic_evolution.py --generations 5 --population 8
 ```
 
-## 📋 **Requirements**
+## Requirements
 
-### For Fractal Flames:
-```bash
-# Install Flam3 (Fedora)
-sudo dnf install flam3
+- Linux (Fedora/Ubuntu recommended)
+- Python 3.8+
+- flam3 package
+- Python packages: Pillow, numpy, pandas, scikit-learn, tkinter
 
-# Install Python dependencies  
-pip install Pillow numpy
-```
+## Output Locations
 
-### For 3D Fractals:
-- Mandelbulber2 (not in Fedora repos - needs manual installation)
-
-## 📁 **Results**
-
-Your fractals are saved in:
-- GUI mode: `output/gui_fractals/`
-- Command line: `output/flam3_evolution/` or `output/basic_evolution/`
-
-## 🎯 **Tips**
-
-- **Start with simulation mode** to test quickly
-- **Fractal Flames (Flam3)** are fully working and recommended  
-- **Higher quality** = better images but much slower rendering
-- **More generations** = more evolution but takes longer
-- **Population of 6-8** works well for most cases
-- **Results get better** over multiple generations as the algorithm learns
-
-## 🆘 **Troubleshooting**
-
-### "Flam3 not found"
-```bash
-sudo dnf install flam3
-```
-
-### "PIL not found"  
-```bash  
-pip install Pillow
-```
-
-### GUI won't start
-Make sure you have tkinter:
-```bash
-python3 -c "import tkinter; print('GUI available')"
-```
-
-### No images generated
-- Check the output directory exists
-- Try simulation mode first to test the algorithm
-- Check the status log for error messages
-
-## 🔗 **More Information**
-
-- GitHub: https://github.com/mlflautt/FractalGenesis
-- Flam3 Documentation: http://flam3.com/
-- Mandelbulber: https://mandelbulber.org/
-
-Enjoy creating beautiful evolved fractals! 🎨✨
+- GUI fractals: `output/gui_fractals/`
+- CLI fractals: `output/flam3_evolution/`
+- Selection data: `data/user_selections/`
+- AI models: `selectors/`

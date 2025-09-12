@@ -132,7 +132,11 @@ def main():
     print()
     
     # Initialize renderer
-    output_dir = "output/flam3_evolution"
+    output_dir = os.environ.get('FRACTAL_OUTPUT_DIR', 'output/flam3_evolution')
+    
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+    
     renderer = Flam3Renderer(
         output_dir=output_dir,
         quality=args.quality,

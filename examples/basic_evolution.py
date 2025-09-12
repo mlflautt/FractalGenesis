@@ -98,8 +98,8 @@ def main():
     print()
     
     # Create directories
-    output_dir = project_root / "renders"
-    output_dir.mkdir(exist_ok=True)
+    output_dir = Path(os.environ.get('FRACTAL_OUTPUT_DIR', str(project_root / "renders")))
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     # Initialize components
     print("Initializing components...")
