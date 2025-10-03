@@ -13,5 +13,13 @@ This replaces Mandelbulber for better integration and control.
 """
 
 from .fractal_animator import FractalRenderer, FractalParams, FractalPresets
+from .advanced_lighting import (
+    AdvancedFractalRenderer, AdvancedFractalParams, AdvancedLightingParams,
+    AdvancedLightingPresets
+)
 
-__all__ = ['FractalRenderer', 'FractalParams', 'FractalPresets']
+__all__ = [
+    'FractalRenderer', 'FractalParams', 'FractalPresets',
+    'AdvancedFractalRenderer', 'AdvancedFractalParams', 
+    'AdvancedLightingParams', 'AdvancedLightingPresets'
+]
