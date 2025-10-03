@@ -4,7 +4,7 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 ## Project Overview
 
-FractalGenesis is an AI-powered fractal evolution system that uses genetic algorithms to breed fractals based on user preferences. It now features a revolutionary **Python-based 3D fractal renderer** achieving 0.14-0.40 seconds per frame with complete parameter control, replacing the previous Mandelbulber dependency.
+FractalGenesis is a fractal evolution system that uses genetic algorithms to evolve fractals based on user preferences. Features a Python-based 3D fractal renderer achieving 0.14-0.40 seconds per frame with complete parameter control, replacing the previous Mandelbulber dependency.
 
 ## Known Issues
 
@@ -116,7 +116,7 @@ python3 test_material_id.py
 - **User preference integration**: Converts selections into fitness scores
 
 **3. Multi-Renderer Architecture (`renderers/`)**
-- **Python3DRenderer**: High-performance Python 3D fractal renderer (NEW) ⭐
+- **Python3DRenderer**: High-performance Python 3D fractal renderer (NEW)
 - **BaseRenderer**: Abstract interface for all fractal engines
 - **Flam3Renderer**: 2D fractal flames via flam3 CLI tools
 - **MandelbulberRenderer**: Legacy 3D fractals via Mandelbulber CLI (deprecated)

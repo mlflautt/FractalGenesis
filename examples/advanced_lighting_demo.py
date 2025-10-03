@@ -320,8 +320,8 @@ def demo_custom_lighting():
 
 def main():
     """Run the complete advanced lighting demo"""
-    print("🌟 Advanced Lighting Demo - Mandelbulb3D-Style Features\\n")
-    print("This demonstrates advanced lighting capabilities inspired by Mandelbulb3D\\n")
+    print("Advanced Lighting Demo - Mandelbulb3D-Style Features\n")
+    print("Demonstrates advanced lighting capabilities inspired by Mandelbulb3D\n")
     
     try:
         # Run all demos
@@ -346,17 +346,17 @@ def main():
         print("✅ Individual Features: 4 feature tests completed")
         print("✅ Custom Lighting: Dramatic 3-point setup rendered")
         
-        print(f"\\n📁 All outputs saved to: output/advanced_lighting_demo/")
+        print("\nAll outputs saved to: output/advanced_lighting_demo/")
         
-        print("\\n🚀 Advanced Lighting Features Ready!")
-        print("   ✨ Hard lighting with sharp shadows")
-        print("   🌅 Soft diffuse lighting gradients") 
-        print("   🕳️  Ambient occlusion for depth")
-        print("   💡 Up to 3 configurable light sources")
-        print("   🔮 Subsurface scattering simulation")
-        print("   ⚡ High-performance JIT compilation")
+        print("\nAdvanced Lighting Features:")
+        print("   - Hard lighting with sharp shadows")
+        print("   - Soft diffuse lighting gradients") 
+        print("   - Ambient occlusion for depth")
+        print("   - Up to 3 configurable light sources")
+        print("   - Subsurface scattering simulation")
+        print("   - High-performance JIT compilation")
         
-        print("\\n🎨 Professional Lighting Presets:")
+        print("\nProfessional Lighting Presets:")
         print("   - Mandelbulb3D Classic")
         print("   - Soft Artistic")
         print("   - Dramatic Contrast") 

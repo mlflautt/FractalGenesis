@@ -4,12 +4,12 @@ High-performance Python-based 3D fractal rendering system for FractalGenesis.
 
 ## Features
 
-✅ **Multiple Fractal Types**: Mandelbulb, 3D Julia sets, extensible architecture  
-✅ **High Performance**: 0.14-0.40s per frame (800x600) with Numba JIT compilation  
-✅ **Advanced Materials**: Metallic/roughness PBR-style shading  
-✅ **Color Palettes**: Warm, Cool, Rainbow, Fire, Ice, Monochrome  
-✅ **Animation System**: Parameter interpolation and frame-by-frame rendering  
-✅ **Complete Control**: All parameters accessible via Python API  
+- Multiple fractal types: Mandelbulb, 3D Julia sets, extensible architecture  
+- High performance: 0.14-0.40s per frame (800x600) with Numba JIT compilation  
+- Advanced materials: Metallic/roughness PBR-style shading  
+- Color palettes: Warm, Cool, Rainbow, Fire, Ice, Monochrome  
+- Animation system: Parameter interpolation and frame-by-frame rendering  
+- Complete control: All parameters accessible via Python API
 
 ## Usage
 
@@ -34,10 +34,10 @@ image, metrics = renderer.render(params)
 
 ## Performance
 
-- **Numba JIT**: ~0.2s per frame (800x600)
-- **Animation**: ~0.5s per frame (400x300) including I/O
-- **Parallel Processing**: Multi-core ray marching
-- **Memory Efficient**: Optimized parameter passing
+- Numba JIT: ~0.2s per frame (800x600)
+- Animation: ~0.5s per frame (400x300) including I/O
+- Parallel processing: Multi-core ray marching
+- Memory efficient: Optimized parameter passing
 
 ## Integration
 

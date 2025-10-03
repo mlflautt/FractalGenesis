@@ -232,8 +232,8 @@ def demo_integration_example():
 
 def main():
     """Run the complete demo"""
-    print("🌟 Python 3D Fractal Renderer Integration Demo\n")
-    print("This demonstrates the new Python-based system that replaces Mandelbulber\n")
+    print("Python 3D Fractal Renderer Integration Demo\n")
+    print("Demonstrates the new Python-based system that replaces Mandelbulber\n")
     
     # Run all demos
     try:
@@ -262,9 +262,9 @@ def main():
         best_fitness = evolution_results[0]["fitness"]
         print(f"   Best fitness achieved: {best_fitness:.3f}")
         
-        print(f"\n📁 All outputs saved to: output/python_3d_demo/")
+        print(f"\nAll outputs saved to: output/python_3d_demo/")
         
-        print(f"\n🚀 The Python 3D renderer is ready for FractalGenesis integration!")
+        print(f"\nPython 3D renderer ready for FractalGenesis integration:")
         print("   - High performance suitable for evolution populations")
         print("   - Complete parameter control for genetic algorithms")
         print("   - Native animation capabilities")

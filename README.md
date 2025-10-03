@@ -1,31 +1,29 @@
 # FractalGenesis
 
-**AI-Powered Fractal Evolution System with High-Performance Python 3D Rendering**
+Fractal generation and evolution system using genetic algorithms. Features a high-performance Python 3D fractal renderer (0.14-0.40s per frame) with complete parameter control, replacing external dependencies like Mandelbulber.
 
-FractalGenesis is an advanced fractal generation and evolution system that uses genetic algorithms to evolve fractals based on user preferences. The system features a revolutionary **Python-based 3D fractal renderer** that achieves 0.14-0.40 seconds per frame with complete parameter control.
+## Features
 
-## 🌟 Key Features
+### Python 3D Renderer
+- 0.14-0.40s per frame (800x600) with Numba JIT compilation
+- Multiple fractal types: Mandelbulb, 3D Julia sets, extensible architecture
+- Advanced materials: Metallic/roughness PBR shading, subsurface scattering
+- Animation system: Parameter interpolation and frame sequencing
+- Complete Python API control
 
-### 🚀 High-Performance Python 3D Renderer
-- **Ultra-Fast Rendering**: 0.14-0.40s per frame (800x600) with Numba JIT compilation
-- **Multiple Fractal Types**: Mandelbulb, 3D Julia sets, extensible architecture
-- **Advanced Materials**: Metallic/roughness PBR-style shading
-- **Animation System**: Native parameter interpolation and frame sequencing
-- **Complete Control**: All parameters accessible via Python API
+### Evolution System
+- Genetic algorithms for population-based fractal evolution
+- Machine learning models learn user aesthetic preferences
+- Interactive selection with real-time feedback
+- Automated generation using trained AI models
 
-### 🧬 Evolutionary Intelligence
-- **Genetic Algorithms**: Population-based fractal evolution
-- **AI Preference Learning**: Machine learning models learn user aesthetic preferences  
-- **Interactive Selection**: User-guided evolution with real-time feedback
-- **Automated Generation**: AI can generate fractals without user intervention
+### Rendering Quality
+- 6 color palettes: Warm, Cool, Rainbow, Fire, Ice, Monochrome
+- Advanced lighting: Hard/soft shadows, ambient occlusion, multiple light sources
+- Material properties: Metallic, roughness, transmittance
+- Multiple coloring modes: Orbit trap, distance, normal, iteration-based
 
-### 🎨 Visual Quality
-- **6 Color Palettes**: Warm, Cool, Rainbow, Fire, Ice, Monochrome
-- **Advanced Lighting**: Diffuse, specular, ambient with configurable sources
-- **Material Properties**: Metallic and roughness parameters
-- **Multiple Coloring Modes**: Orbit trap, distance, normal, iteration-based
-
-## 🏗️ Architecture
+## Architecture
 
 ```
 FractalGenesis/
@@ -40,7 +38,7 @@ FractalGenesis/
 └── data/                     # User selections and training data
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 
@@ -91,15 +89,15 @@ python3 fractal_launcher.py
 python3 examples/flam3_evolution.py --render --generations 5
 ```
 
-## 📊 Performance Comparison
+## Performance Comparison
 
 | System | Speed (800x600) | Control | Integration |
 |--------|----------------|---------|-------------|
-| **Python 3D** | **~0.2s** | **Complete** | **Native** ✅ |
+| Python 3D | ~0.2s | Complete | Native |
 | Mandelbulber | ~2-10s | CLI Limited | External |
 | Flam3 | ~1-5s | XML Config | External |
 
-## 🎬 Animation Capabilities
+## Animation Capabilities
 
 Create smooth animations with parameter interpolation:
 
@@ -120,7 +118,7 @@ frame_paths = renderer.create_animation(
 renderer.create_gif(frame_paths, "power_evolution.gif", fps=10)
 ```
 
-## 🧠 AI Integration
+## AI Integration
 
 ### Train AI on Your Preferences
 ```bash
@@ -140,7 +138,7 @@ python3 manage_ai.py evolve "My Style" --generations 10
 - **Selection Strategy**: Tournament, roulette, or AI-guided
 - **Parameter Space**: ~10^10 combinations for exploration
 
-## 🔬 Technical Details
+## Technical Details
 
 ### Python 3D Renderer Architecture
 
@@ -164,7 +162,7 @@ def render_fractal_fast(image, width, height, params_array):
 - Efficient parameter packing and memory usage
 - Adaptive ray stepping and early termination
 
-## 🎯 Parameter Control
+## Parameter Control
 
 ### Verified Parameter Impact
 Our testing shows significant visual impact (>5% difference) for:
@@ -187,7 +185,7 @@ parameter_ranges = {
 }
 ```
 
-## 🔧 Development
+## Development
 
 ### Adding New Fractal Types
 
@@ -214,7 +212,7 @@ def get_distance_and_info(x, y, z, fractal_type, ...):
 3. Add tests for new functionality
 4. Submit pull request
 
-## 📁 Project Structure
+## Project Structure
 
 ### Core Components
 - `renderers/python_3d/`: High-performance Python 3D fractal renderer
@@ -229,15 +227,14 @@ def get_distance_and_info(x, y, z, fractal_type, ...):
 - `manage_ai.py`: AI model management
 - `requirements.txt`: All dependencies
 
-## 🎬 Example Outputs
+## Example Outputs
 
-The system generates:
-- **High-quality static images**: 200K+ unique colors, 400K+ surface pixels
-- **Smooth animations**: Parameter interpolation with GIF/video output  
-- **Evolution sequences**: Multi-generation fractal development
-- **Quality metrics**: Quantified diversity and complexity measures
+- High-quality static images: 200K+ unique colors, 400K+ surface pixels
+- Smooth animations: Parameter interpolation with GIF/video output  
+- Evolution sequences: Multi-generation fractal development
+- Quality metrics: Quantified diversity and complexity measures
 
-## 🔮 Future Enhancements
+## Future Enhancements
 
 ### Planned Features
 1. **Additional Fractal Types**: Mandelbox, Burning Ship, Menger Sponge
@@ -253,18 +250,18 @@ The system generates:
 - Reinforcement learning for automated parameter optimization
 - Multi-objective optimization for aesthetic and mathematical properties
 
-## 📜 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built upon research in genetic algorithms and fractal mathematics
 - Inspired by Mandelbulb3D's lighting and material systems
 - Uses Numba for high-performance Python computation
 - Integrates ideas from the fractal art community
 
-## 📞 Contact
+## Contact
 
 - **Issues**: Create GitHub issues for bugs and feature requests
 - **Discussions**: Use GitHub discussions for questions and ideas  
@@ -272,6 +269,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-**FractalGenesis** - Where Mathematics Meets Evolution 🧬✨
-
-*Generating infinite beauty through the power of genetic algorithms and high-performance computing.*
+**FractalGenesis** - Fractal evolution through genetic algorithms and high-performance computing.
