@@ -4,6 +4,9 @@ scipy>=1.7.0
 matplotlib>=3.5.0
 pillow>=9.0.0
 
+# High-Performance Computing (for Python 3D fractal renderer)
+numba>=0.56.0  # JIT compilation for fractal rendering
+
 # Machine Learning & Deep Learning
 torch>=1.11.0
 torchvision>=0.12.0

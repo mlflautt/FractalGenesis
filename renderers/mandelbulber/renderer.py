@@ -31,20 +31,24 @@ class MandelbulberRenderer:
     """
     
     def __init__(self, 
-                 mandelbulber_path: str = "mandelbulber2",
+                 mandelbulber_path: Optional[str] = None,
                  temp_dir: Optional[str] = None,
                  output_dir: Optional[str] = None):
         """
         Initialize the Mandelbulber renderer.
         
         Args:
-            mandelbulber_path: Path to mandelbulber2 executable
+            mandelbulber_path: Path to mandelbulber2 executable (auto-detected if None)
             temp_dir: Directory for temporary files
             output_dir: Directory for rendered images
         """
-        self.mandelbulber_path = mandelbulber_path
+        # Auto-detect Mandelbulber installation
+        self.mandelbulber_path = mandelbulber_path or self._detect_mandelbulber()
         self.temp_dir = Path(temp_dir) if temp_dir else Path(tempfile.gettempdir())
         self.output_dir = Path(output_dir) if output_dir else Path("./renders")
+        
+        # Store whether we're using Flatpak (must be set before availability check)
+        self.using_flatpak = "flatpak run" in str(self.mandelbulber_path)
         
         # Ensure directories exist
         self.temp_dir.mkdir(parents=True, exist_ok=True)
@@ -59,6 +63,37 @@ class MandelbulberRenderer:
         self.worker_threads: List[threading.Thread] = []
         self.max_workers = 4
         
+    def _detect_mandelbulber(self) -> str:
+        """
+        Auto-detect Mandelbulber installation (system, Flatpak, etc.).
+        
+        Returns:
+            String command to run Mandelbulber
+        """
+        # Try standard system installation first
+        try:
+            result = subprocess.run(["mandelbulber2", "--version"], 
+                                  capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                logger.info("Mandelbulber found via system installation")
+                return "mandelbulber2"
+        except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+        
+        # Try Flatpak installation
+        try:
+            result = subprocess.run(["flatpak", "run", "com.github.buddhi1980.mandelbulber2", "--version"], 
+                                  capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                logger.info("Mandelbulber found via Flatpak")
+                return "flatpak run com.github.buddhi1980.mandelbulber2"
+        except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+        
+        # Default fallback
+        logger.warning("Mandelbulber not found, using default path")
+        return "mandelbulber2"
+    
     def _check_mandelbulber_availability(self) -> bool:
         """
         Check if Mandelbulber is available on the system.
@@ -67,8 +102,13 @@ class MandelbulberRenderer:
             bool: True if Mandelbulber is available
         """
         try:
-            result = subprocess.run([self.mandelbulber_path, "--version"], 
-                                  capture_output=True, text=True, timeout=10)
+            # Build command based on whether we're using Flatpak
+            if self.using_flatpak:
+                cmd = self.mandelbulber_path.split() + ["--version"]
+            else:
+                cmd = [self.mandelbulber_path, "--version"]
+                
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             if result.returncode == 0:
                 logger.info(f"Mandelbulber found: {result.stdout.strip()}") 
                 return True
@@ -111,19 +151,31 @@ class MandelbulberRenderer:
                 f.write(fract_content)
             
             # Build mandelbulber command
-            cmd = [
-                self.mandelbulber_path,
-                "--nogui",
-                "--settings", str(fract_path),
-                "--output", str(output_path),
-                "--format", "png"
-            ]
-            
-            # Add size parameters if specified
-            if parameters.render.image_width and parameters.render.image_height:
-                cmd.extend([
-                    "--size", f"{parameters.render.image_width}x{parameters.render.image_height}"
-                ])
+            if self.using_flatpak:
+                cmd = self.mandelbulber_path.split() + [
+                    "--nogui",
+                    str(fract_path),  # Flatpak version takes settings file as positional argument
+                    "--output", str(output_path),
+                    "--format", "png"
+                ]
+                # Add size parameters if specified (Flatpak uses --res format)
+                if parameters.render.image_width and parameters.render.image_height:
+                    cmd.extend([
+                        "--res", f"{parameters.render.image_width}x{parameters.render.image_height}"
+                    ])
+            else:
+                cmd = [
+                    self.mandelbulber_path,
+                    "--nogui",
+                    "--settings", str(fract_path),
+                    "--output", str(output_path),
+                    "--format", "png"
+                ]
+                # Add size parameters if specified
+                if parameters.render.image_width and parameters.render.image_height:
+                    cmd.extend([
+                        "--size", f"{parameters.render.image_width}x{parameters.render.image_height}"
+                    ])
             
             logger.debug(f"Running command: {' '.join(cmd)}")
             
