@@ -1,0 +1,37 @@
+GENERATED PARAMETERS:
+# Mandelbulber settings file
+# version 2.33
+# only modified parameters
+[main_parameters]
+image_width 800;
+image_height 600;
+camera 0.0 0.0 -3.0;
+target 0.0 0.0 0.0;
+camera_top 0.0 1.0 0.0;
+fov 1.0;
+formula_1 9;
+formula_iterations_1 250;
+power 8.0;
+detail_level 1.0;
+DE_thresh 0.01;
+view_distance_max 15.0;
+view_distance_min 1e-15;
+analityc_DE_mode 1;
+formula_material_id_1 1;
+mat1_is_defined true;
+mat1_surface_color ffff 0000 0000;
+mat1_shading 1;
+mat1_specular 1.0;
+mat1_surface_roughness 0.1;
+mat1_metallic false;
+mat1_reflectance 0.0;
+main_light_alpha -45.0;
+main_light_beta 45.0;
+main_light_intensity 1.0;
+aux_light_enabled_1 true;
+aux_light_position_1 3.0 -3.0 -3.0;
+aux_light_intensity_1 1.5;
+aux_light_colour_1 e800 9500 4200;
+aux_light_visibility 6.0;
+shadows_enabled 1;
+ambient_light_intensity 1.0;

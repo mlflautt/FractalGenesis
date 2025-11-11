@@ -117,6 +117,7 @@ class MandelbulberParameters:
     def to_fract_file(self) -> str:
         """
         Generate a complete .fract file content string in the correct Mandelbulber format.
+        Based on working Mandelbulber examples and parameter list.
         
         Returns:
             str: Complete .fract file content
@@ -124,61 +125,70 @@ class MandelbulberParameters:
         lines = []
         lines.append("# Mandelbulber settings file")
         lines.append("# version 2.33")
-        lines.append("")
-        
-        # Main parameters section (new format)
+        lines.append("# only modified parameters")
         lines.append("[main_parameters]")
         
-        # Image dimensions
+        # Image dimensions (correct parameter names)
         lines.append(f"image_width {self.render.image_width};")
         lines.append(f"image_height {self.render.image_height};")
         
-        # Camera parameters (using correct names)
+        # Camera parameters (using actual Mandelbulber parameter names)
         lines.append(f"camera {self.camera.camera_x} {self.camera.camera_y} {self.camera.camera_z};")
         lines.append(f"target {self.camera.target_x} {self.camera.target_y} {self.camera.target_z};")
-        lines.append(f"camera_up {self.camera.camera_up_x} {self.camera.camera_up_y} {self.camera.camera_up_z};")
-        lines.append(f"flight_rotation {self.camera.flight_rotation_x} {self.camera.flight_rotation_y} {self.camera.flight_rotation_z};")
+        lines.append(f"camera_top {self.camera.camera_up_x} {self.camera.camera_up_y} {self.camera.camera_up_z};")
         lines.append(f"fov {self.camera.fov};")
-        lines.append(f"perspective_type {self.camera.perspective_type};")
         
-        # Fractal parameters (using correct format)
+        # Fractal parameters (using correct names and format)
         formula_id = self._get_formula_id(self.fractal.formula_name)
         lines.append(f"formula_1 {formula_id};")
-        lines.append(f"power {self.fractal.power};")
-        lines.append(f"bailout {self.fractal.bailout};")
-        lines.append(f"formula_maxiter_1 {self.fractal.iterations};")
+        lines.append(f"formula_iterations_1 {self.fractal.iterations};")
         
-        if self.fractal.julia_mode:
-            lines.append(f"julia_mode_1 1;")
-            lines.append(f"julia_c_1 {self.fractal.julia_c_x} {self.fractal.julia_c_y} {self.fractal.julia_c_z};")
+        # Use correct power parameter name based on formula
+        if self.fractal.formula_name == "mandelbulb":
+            lines.append(f"power {self.fractal.power};")
         
-        # Add hybrid fractals if any
-        for i, hybrid in enumerate(self.hybrid_fractals, start=2):
-            hybrid_id = self._get_formula_id(hybrid.formula_name)
-            lines.append(f"formula_{i} {hybrid_id};")
-            lines.append(f"formula_maxiter_{i} {hybrid.iterations};")
-        
-        # Rendering parameters
+        # Rendering parameters (correct names)
         lines.append(f"detail_level {self.render.detail_level};")
-        lines.append(f"DE_threshold {self.render.de_threshold};")
-        lines.append(f"quality {self.render.quality};")
-        lines.append(f"SSAO_enabled {1 if self.render.ssao_enabled else 0};")
+        lines.append(f"DE_thresh {self.render.de_threshold};")
+        lines.append(f"view_distance_max 15.0;")
+        lines.append(f"view_distance_min 1e-15;")
+        lines.append(f"analityc_DE_mode 1;")
         
-        # Material parameters (using correct format)
-        lines.append(f"surface_color_1 {int(self.material.surface_color_r*65535)} {int(self.material.surface_color_g*65535)} {int(self.material.surface_color_b*65535)};")
-        lines.append(f"specular_1 {int(self.material.specular_r*65535)} {int(self.material.specular_g*65535)} {int(self.material.specular_b*65535)};")
-        lines.append(f"specular_width_1 {self.material.specular_width};")
-        lines.append(f"roughness_1 {self.material.roughness};")
-        lines.append(f"reflectance_1 {self.material.reflectance};")
-        lines.append(f"transparency_of_surface_1 {self.material.transparency};")
+        # Julia mode if enabled
+        if self.fractal.julia_mode:
+            lines.append(f"julia_mode 1;")
+            lines.append(f"julia_c {self.fractal.julia_c_x} {self.fractal.julia_c_y} {self.fractal.julia_c_z};")
         
-        # Lighting parameters
+        # Material definition (CRITICAL - must associate formula with material)
+        lines.append(f"formula_material_id_1 1;")
+        lines.append(f"mat1_is_defined true;")
+        
+        # Material parameters (using hex color format)
+        r_hex = f"{int(self.material.surface_color_r * 65535):04x}"
+        g_hex = f"{int(self.material.surface_color_g * 65535):04x}" 
+        b_hex = f"{int(self.material.surface_color_b * 65535):04x}"
+        lines.append(f"mat1_surface_color {r_hex} {g_hex} {b_hex};")
+        lines.append(f"mat1_shading {1 if True else 0};")
+        lines.append(f"mat1_specular {self.material.specular_width};")
+        lines.append(f"mat1_surface_roughness {self.material.roughness};")
+        lines.append(f"mat1_metallic {str(False).lower()};")
+        lines.append(f"mat1_reflectance {self.material.reflectance};")
+        
+        # Lighting parameters (correct names)
         lines.append(f"main_light_alpha {self.lighting.main_light_alpha};")
         lines.append(f"main_light_beta {self.lighting.main_light_beta};")
         lines.append(f"main_light_intensity {self.lighting.main_light_intensity};")
-        lines.append(f"main_light_colour {int(self.lighting.main_light_color_r*65535)} {int(self.lighting.main_light_color_g*65535)} {int(self.lighting.main_light_color_b*65535)};")
-        lines.append(f"ambient_light_intensity {self.lighting.ambient_light_intensity};")
+        
+        # Auxiliary light for better visibility
+        lines.append(f"aux_light_enabled_1 true;")
+        lines.append(f"aux_light_position_1 3.0 -3.0 -3.0;")
+        lines.append(f"aux_light_intensity_1 1.5;")
+        lines.append(f"aux_light_colour_1 e800 9500 4200;")
+        lines.append(f"aux_light_visibility 6.0;")
+        
+        # Global settings for visibility
         lines.append(f"shadows_enabled {1 if self.lighting.shadows_enabled else 0};")
+        lines.append(f"ambient_light_intensity {self.lighting.ambient_light_intensity};")
         
         # Custom parameters (if any)
         for key, value in self.custom_parameters.items():
@@ -190,23 +200,21 @@ class MandelbulberParameters:
         """
         Convert formula name to Mandelbulber formula ID.
         
-        Based on testing, these are the working formula IDs:
-        - Formula 2: Mandelbulb (good results)
-        - Formula 3: Alternative 3D fractal
-        - Formula 4: Another 3D fractal  
-        - Formula 5: Another 3D fractal
-        - Formula 7: Another 3D fractal
-        - Formula 10: Another 3D fractal
+        Based on Mandelbulber documentation and testing:
+        - Formula 2: Mandelbulb Power 2 (good basic fractal)
+        - Formula 6: Mandelbox
+        - Formula 9: Mandelbulb (classic - the most commonly used)
+        - Formula 10: Various other 3D fractals
         """
         formula_mapping = {
-            'mandelbulb': 2,
-            'mandelbox': 6,    # Based on common mapping, though produces small files
-            'menger_sponge': 8, # Guess - needs verification 
-            'julia': 3,        # Alternative formula for Julia sets
-            'default': 2       # Default to Mandelbulb
+            'mandelbulb': 9,       # Classic Mandelbulb - most reliable
+            'mandelbox': 6,        # Mandelbox fractal
+            'menger_sponge': 8,    # IFS-based fractal
+            'julia': 2,            # Simpler variant for Julia sets
+            'default': 9           # Default to classic Mandelbulb
         }
         
-        return formula_mapping.get(formula_name.lower(), 2)
+        return formula_mapping.get(formula_name.lower(), 9)
     
     def mutate(self, mutation_rate: float = 0.1, mutation_strength: float = 0.1):
         """
