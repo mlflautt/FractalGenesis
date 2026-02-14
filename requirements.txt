@@ -49,3 +49,13 @@ dash>=2.0.0  # For web-based interface alternative
 # Optional: For advanced ML features
 transformers>=4.15.0  # If we want to experiment with vision transformers
 tensorboard>=2.8.0  # For training visualization
+
+# Animation & Video Export
+ffmpeg-python>=0.2.0  # Video encoding (MP4, ProRes)
+
+# GPU Acceleration (optional but recommended)
+taichi>=1.6.0  # GPU-accelerated preview (120x faster)
+
+# GUI & Visualization
+moderngl>=5.8.0  # OpenGL preview
+imgui>=2.0.0  # Immediate mode GUI for keyframe editor
