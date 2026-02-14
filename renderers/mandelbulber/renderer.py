@@ -1,382 +1,226 @@
+#!/usr/bin/env python3
 """
-Mandelbulber Renderer Class
+Mandelbulber Renderer - Fixed for Mandelbulber 2.34+
+=====================================================
 
-This module provides the main interface for rendering fractals using Mandelbulber.
-It handles CLI calls, file management, and batch processing for the genetic algorithm.
+Uses the new INI-style settings format that Mandelbulber 2.34 expects.
 """
 
-import os
 import subprocess
-import tempfile
-import time
-import logging
+import random
+import math
+import os
 from pathlib import Path
-from typing import Optional, List, Tuple, Dict
-from PIL import Image
-import threading
-from queue import Queue, Empty
-
-from .parameters import MandelbulberParameters
-
+from typing import Dict, List, Optional, Tuple, Any
+import logging
 
 logger = logging.getLogger(__name__)
 
 
 class MandelbulberRenderer:
-    """
-    Interface for Mandelbulber fractal rendering.
-    
-    Manages .fract file generation, CLI calls, and batch processing
-    for efficient fractal generation in genetic algorithms.
-    """
-    
-    def __init__(self, 
-                 mandelbulber_path: Optional[str] = None,
-                 temp_dir: Optional[str] = None,
-                 output_dir: Optional[str] = None):
-        """
-        Initialize the Mandelbulber renderer.
-        
-        Args:
-            mandelbulber_path: Path to mandelbulber2 executable (auto-detected if None)
-            temp_dir: Directory for temporary files
-            output_dir: Directory for rendered images
-        """
-        # Auto-detect Mandelbulber installation
-        self.mandelbulber_path = mandelbulber_path or self._detect_mandelbulber()
-        self.temp_dir = Path(temp_dir) if temp_dir else Path(tempfile.gettempdir())
-        self.output_dir = Path(output_dir) if output_dir else Path("./renders")
-        
-        # Store whether we're using Flatpak (must be set before availability check)
-        self.using_flatpak = "flatpak run" in str(self.mandelbulber_path)
-        
-        # Ensure directories exist
-        self.temp_dir.mkdir(parents=True, exist_ok=True)
+    """Integration with Mandelbulber 3D fractal renderer."""
+
+    def __init__(self, output_dir: str = "output/mandelbulber"):
+        self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Check if Mandelbulber is available
-        self.is_available = self._check_mandelbulber_availability()
-        
-        # Thread pool for batch rendering
-        self.render_queue = Queue()
-        self.results_queue = Queue()
-        self.worker_threads: List[threading.Thread] = []
-        self.max_workers = 4
-        
-    def _detect_mandelbulber(self) -> str:
-        """
-        Auto-detect Mandelbulber installation (system, Flatpak, etc.).
-        
-        Returns:
-            String command to run Mandelbulber
-        """
-        # Try standard system installation first
+        self.settings_dir = self.output_dir / "settings"
+        self.settings_dir.mkdir(parents=True, exist_ok=True)
+
+        self.mandelbulber_cmd = self._find_mandelbulber()
+        if not self.mandelbulber_cmd:
+            raise RuntimeError(
+                "Mandelbulber not found. Install with:\n"
+                "  flatpak install com.github.buddhi1980.mandelbulber2"
+            )
+        logger.info(f"Using Mandelbulber: {' '.join(self.mandelbulber_cmd)}")
+
+    def _find_mandelbulber(self) -> Optional[List[str]]:
+        """Find available Mandelbulber installation."""
         try:
-            result = subprocess.run(["mandelbulber2", "--version"], 
-                                  capture_output=True, text=True, timeout=5)
+            result = subprocess.run(
+                ["flatpak", "run", "com.github.buddhi1980.mandelbulber2", "--version"],
+                capture_output=True, text=True, timeout=10
+            )
             if result.returncode == 0:
-                logger.info("Mandelbulber found via system installation")
-                return "mandelbulber2"
-        except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
+                return ["flatpak", "run", "com.github.buddhi1980.mandelbulber2"]
+        except:
             pass
-        
-        # Try Flatpak installation
+
         try:
-            result = subprocess.run(["flatpak", "run", "com.github.buddhi1980.mandelbulber2", "--version"], 
-                                  capture_output=True, text=True, timeout=10)
+            result = subprocess.run(
+                ["mandelbulber2", "--version"],
+                capture_output=True, text=True, timeout=10
+            )
             if result.returncode == 0:
-                logger.info("Mandelbulber found via Flatpak")
-                return "flatpak run com.github.buddhi1980.mandelbulber2"
-        except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
+                return ["mandelbulber2"]
+        except:
             pass
-        
-        # Default fallback
-        logger.warning("Mandelbulber not found, using default path")
-        return "mandelbulber2"
-    
-    def _check_mandelbulber_availability(self) -> bool:
-        """
-        Check if Mandelbulber is available on the system.
-        
-        Returns:
-            bool: True if Mandelbulber is available
-        """
-        try:
-            # Build command based on whether we're using Flatpak
-            if self.using_flatpak:
-                cmd = self.mandelbulber_path.split() + ["--version"]
-            else:
-                cmd = [self.mandelbulber_path, "--version"]
-                
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            if result.returncode == 0:
-                logger.info(f"Mandelbulber found: {result.stdout.strip()}") 
-                return True
-        except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired) as e:
-            logger.warning(f"Mandelbulber not found at {self.mandelbulber_path}: {e}")
-            
-        return False
-    
-    def render_single(self, 
-                     parameters: MandelbulberParameters,
-                     output_filename: Optional[str] = None,
-                     thumbnail_size: Optional[Tuple[int, int]] = None) -> Optional[Path]:
-        """
-        Render a single fractal image.
-        
-        Args:
-            parameters: Fractal parameters to render
-            output_filename: Optional custom output filename
-            thumbnail_size: Optional size for thumbnail generation (width, height)
-            
-        Returns:
-            Path to rendered image file or None if failed
-        """
-        if not self.is_available:
-            logger.error("Mandelbulber not available for rendering")
-            return None
-            
-        # Generate unique filename if not provided
-        if not output_filename:
-            timestamp = int(time.time() * 1000)
-            output_filename = f"fractal_{timestamp}.png"
-            
-        output_path = self.output_dir / output_filename
-        fract_path = self.temp_dir / f"{output_filename}.fract"
-        
-        try:
-            # Write .fract file
-            fract_content = parameters.to_fract_file()
-            with open(fract_path, 'w') as f:
-                f.write(fract_content)
-            
-            # Build mandelbulber command
-            if self.using_flatpak:
-                cmd = self.mandelbulber_path.split() + [
-                    "--nogui",
-                    str(fract_path),  # Flatpak version takes settings file as positional argument
-                    "--output", str(output_path),
-                    "--format", "png"
-                ]
-                # Add size parameters if specified (Flatpak uses --res format)
-                if parameters.render.image_width and parameters.render.image_height:
-                    cmd.extend([
-                        "--res", f"{parameters.render.image_width}x{parameters.render.image_height}"
-                    ])
-            else:
-                cmd = [
-                    self.mandelbulber_path,
-                    "--nogui",
-                    "--settings", str(fract_path),
-                    "--output", str(output_path),
-                    "--format", "png"
-                ]
-                # Add size parameters if specified
-                if parameters.render.image_width and parameters.render.image_height:
-                    cmd.extend([
-                        "--size", f"{parameters.render.image_width}x{parameters.render.image_height}"
-                    ])
-            
-            logger.debug(f"Running command: {' '.join(cmd)}")
-            
-            # Execute render
-            result = subprocess.run(cmd, 
-                                  capture_output=True, 
-                                  text=True, 
-                                  timeout=300)  # 5 minute timeout
-            
-            if result.returncode != 0:
-                logger.error(f"Mandelbulber render failed: {result.stderr}")
-                return None
-            
-            # Verify output file exists
-            if not output_path.exists():
-                logger.error(f"Output file not created: {output_path}")
-                return None
-                
-            # Generate thumbnail if requested
-            if thumbnail_size:
-                self._create_thumbnail(output_path, thumbnail_size)
-            
-            # Cleanup temp file
-            if fract_path.exists():
-                fract_path.unlink()
-                
-            logger.info(f"Successfully rendered: {output_path}")
-            return output_path
-            
-        except subprocess.TimeoutExpired:
-            logger.error(f"Render timeout for {output_filename}")
-        except Exception as e:
-            logger.error(f"Render error for {output_filename}: {e}")
-        finally:
-            # Cleanup temp file on error
-            if fract_path.exists():
-                fract_path.unlink()
-                
+
         return None
-    
-    def _create_thumbnail(self, image_path: Path, size: Tuple[int, int]):
-        """
-        Create a thumbnail version of the rendered image.
-        
-        Args:
-            image_path: Path to the original image
-            size: Thumbnail size (width, height)
-        """
-        try:
-            with Image.open(image_path) as img:
-                img.thumbnail(size, Image.Resampling.LANCZOS)
-                thumb_path = image_path.parent / f"thumb_{image_path.name}"
-                img.save(thumb_path, "PNG")
-                logger.debug(f"Created thumbnail: {thumb_path}")
-        except Exception as e:
-            logger.error(f"Failed to create thumbnail for {image_path}: {e}")
-    
-    def render_batch(self, 
-                    parameter_list: List[MandelbulberParameters],
-                    thumbnail_size: Tuple[int, int] = (256, 256),
-                    max_concurrent: int = 4) -> List[Optional[Path]]:
-        """
-        Render multiple fractals concurrently.
-        
-        Args:
-            parameter_list: List of parameter sets to render
-            thumbnail_size: Size for thumbnails
-            max_concurrent: Maximum concurrent renders
-            
-        Returns:
-            List of paths to rendered images (None for failed renders)
-        """
-        if not self.is_available:
-            logger.error("Mandelbulber not available for batch rendering")
-            return [None] * len(parameter_list)
-        
-        results = [None] * len(parameter_list)
-        
-        # Start worker threads
-        self._start_workers(min(max_concurrent, len(parameter_list)))
-        
-        try:
-            # Queue all render jobs
-            for i, params in enumerate(parameter_list):
-                self.render_queue.put((i, params, thumbnail_size))
-            
-            # Wait for all results
-            completed = 0
-            while completed < len(parameter_list):
-                try:
-                    index, result_path = self.results_queue.get(timeout=600)  # 10 min total timeout
-                    results[index] = result_path
-                    completed += 1
-                    logger.info(f"Batch progress: {completed}/{len(parameter_list)}")
-                except Empty:
-                    logger.error("Batch render timeout")
-                    break
-                    
-        finally:
-            # Stop workers
-            self._stop_workers()
-            
-        return results
-    
-    def _start_workers(self, num_workers: int):
-        """Start worker threads for batch processing."""
-        self.worker_threads = []
-        for i in range(num_workers):
-            worker = threading.Thread(target=self._worker_thread, daemon=True)
-            worker.start()
-            self.worker_threads.append(worker)
-    
-    def _worker_thread(self):
-        """Worker thread for processing render queue."""
-        while True:
-            try:
-                item = self.render_queue.get(timeout=1)
-                if item is None:  # Poison pill
-                    break
-                    
-                index, parameters, thumbnail_size = item
-                result_path = self.render_single(
-                    parameters, 
-                    output_filename=f"batch_{index}_{int(time.time()*1000)}.png",
-                    thumbnail_size=thumbnail_size
-                )
-                self.results_queue.put((index, result_path))
-                self.render_queue.task_done()
-                
-            except Empty:
-                continue
-            except Exception as e:
-                logger.error(f"Worker thread error: {e}")
-    
-    def _stop_workers(self):
-        """Stop all worker threads."""
-        # Send poison pills
-        for _ in self.worker_threads:
-            self.render_queue.put(None)
-        
-        # Wait for threads to finish
-        for worker in self.worker_threads:
-            worker.join(timeout=5)
-        
-        self.worker_threads = []
-    
-    def get_render_statistics(self) -> Dict[str, int]:
-        """
-        Get statistics about rendered images.
-        
-        Returns:
-            Dictionary with render statistics
-        """
-        stats = {
-            'total_renders': 0,
-            'total_thumbnails': 0,
-            'disk_usage_mb': 0
+
+    def generate_random_parameters(self) -> Dict[str, Any]:
+        """Generate diverse random fractal parameters."""
+        camera_distance = random.uniform(1.5, 12.0)
+        camera_alpha = random.uniform(0, 360)
+        camera_beta = random.uniform(-60, 60)
+
+        alpha_rad = math.radians(camera_alpha)
+        beta_rad = math.radians(camera_beta)
+
+        camera_x = camera_distance * math.cos(beta_rad) * math.cos(alpha_rad)
+        camera_y = camera_distance * math.cos(beta_rad) * math.sin(alpha_rad)
+        camera_z = camera_distance * math.sin(beta_rad)
+
+        return {
+            "formula": random.choice([9, 10, 11, 12, 13]),
+            "power": random.uniform(2.0, 16.0),
+            "detail_level": random.uniform(0.8, 2.0),
+            "max_iterations": random.randint(100, 400),
+            "camera_x": camera_x,
+            "camera_y": camera_y,
+            "camera_z": camera_z,
+            "target_x": random.uniform(-0.3, 0.3),
+            "target_y": random.uniform(-0.3, 0.3),
+            "target_z": random.uniform(-0.3, 0.3),
+            "fov": random.uniform(30, 90),
+            "color_r": random.randint(80, 255),
+            "color_g": random.randint(80, 255),
+            "color_b": random.randint(80, 255),
+            "ambient_occlusion": random.random() > 0.3,
+            "glow_enabled": random.random() > 0.5,
+            "glow_intensity": random.uniform(0.5, 2.0),
         }
-        
-        if not self.output_dir.exists():
-            return stats
-            
-        for file_path in self.output_dir.iterdir():
-            if file_path.is_file():
-                if file_path.name.startswith('thumb_'):
-                    stats['total_thumbnails'] += 1
-                elif file_path.suffix.lower() in ['.png', '.jpg', '.jpeg']:
-                    stats['total_renders'] += 1
-                    
-                stats['disk_usage_mb'] += file_path.stat().st_size / (1024 * 1024)
-        
-        return stats
-    
-    def cleanup_old_renders(self, max_age_hours: int = 24):
-        """
-        Clean up old render files to save disk space.
-        
-        Args:
-            max_age_hours: Maximum age of files to keep
-        """
-        if not self.output_dir.exists():
-            return
-            
-        cutoff_time = time.time() - (max_age_hours * 3600)
-        removed_count = 0
-        
-        for file_path in self.output_dir.iterdir():
-            if file_path.is_file() and file_path.stat().st_mtime < cutoff_time:
-                try:
-                    file_path.unlink()
-                    removed_count += 1
-                except OSError as e:
-                    logger.warning(f"Failed to remove {file_path}: {e}")
-        
-        if removed_count > 0:
-            logger.info(f"Cleaned up {removed_count} old render files")
-    
-    def __enter__(self):
-        """Context manager entry."""
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit - cleanup resources."""
-        self._stop_workers()
+
+    def _create_settings_file_v234(self, params: Dict, name: str, width: int, height: int) -> str:
+        """Create Mandelbulber 2.34+ INI-style settings file."""
+        cam_x = params.get("camera_x", 3.0)
+        cam_y = params.get("camera_y", -6.0)
+        cam_z = params.get("camera_z", 2.0)
+        target_x = params.get("target_x", 0.0)
+        target_y = params.get("target_y", 0.0)
+        target_z = params.get("target_z", 0.0)
+
+        cam_dist = math.sqrt(cam_x**2 + cam_y**2 + cam_z**2)
+        alpha = math.degrees(math.atan2(cam_y, cam_x))
+        beta = math.degrees(math.asin(cam_z / cam_dist))
+
+        rotation_y = -alpha
+        rotation_x = -beta
+
+        content = f'''[main_parameters]
+image_width={width}
+image_height={height}
+formula_1={params.get("formula", 9)}
+detail_level={params.get("detail_level", 1.0)}
+N={params.get("max_iterations", 200)}
+power={params.get("power", 8.0)}
+camera={cam_x} {cam_y} {cam_z}
+target={target_x} {target_y} {target_z}
+camera_rotation={rotation_x} {rotation_y} 0
+fov={params.get("fov", 53.13)}
+ambient_occlusion={1 if params.get("ambient_occlusion") else 0}
+ambient_occlusion_quality=4
+glow_enabled={1 if params.get("glow_enabled") else 0}
+glow_intensity={params.get("glow_intensity", 1.0)}
+brightness=1.0
+contrast=1.0
+saturation=1.0
+gamma=1.0
+mat1_is_defined=true
+mat1_surface_color={params.get("color_r", 200)*257} {params.get("color_g", 150)*257} {params.get("color_b", 100)*257}
+mat1_shading=1
+mat1_specular=5.0
+mat1_surface_roughness=0.1
+mat1_metallic=1.0
+mat1_use_colors_from_palette=0
+aux_light_enabled_1=true
+aux_light_position_1=3 -3 -3
+aux_light_intensity_1=1.0
+aux_light_colour_1=ffff ffff ffff
+aux_light_visibility=1
+background_color_1=0000 95a2 ffff
+background_color_2=ffff ffff ffff
+background_color_3=0000 2710 01f4
+background_3_colors_enable=1
+save_image_format=0
+file_destination={name}
+
+[fractal_parameters]
+'''
+
+        settings_path = self.settings_dir / f"{name}.fract"
+        with open(settings_path, 'w') as f:
+            f.write(content)
+
+        return str(settings_path)
+
+    def render_fractal(self, params: Dict, output_path: str, width: int = 512, height: int = 512) -> bool:
+        """Render a fractal with the given parameters."""
+        try:
+            output_path_path = Path(output_path)
+            output_path_path.parent.mkdir(parents=True, exist_ok=True)
+
+            name = output_path_path.stem
+            settings_path = self._create_settings_file_v234(params, name, width, height)
+
+            cmd = self.mandelbulber_cmd + [
+                "--nogui",
+                "--format", "png",
+                "--res", f"{width}x{height}",
+                "--output", str(output_path_path),
+                settings_path
+            ]
+
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
+
+            if result.returncode != 0:
+                logger.error(f"Mandelbulber failed: {result.stderr}")
+                return False
+
+            if not output_path_path.exists():
+                logger.error(f"Output not created: {output_path}")
+                return False
+
+            logger.info(f"Rendered: {output_path}")
+            return True
+
+        except subprocess.TimeoutExpired:
+            logger.error("Render timed out")
+            return False
+        except Exception as e:
+            logger.error(f"Render error: {e}")
+            return False
+
+    def render_batch(self, params_list: List[Dict], output_prefix: str = "fractal",
+                     width: int = 512, height: int = 512, max_concurrent: int = 2) -> List[Optional[Path]]:
+        """Render multiple fractals."""
+        results = []
+        for i, params in enumerate(params_list):
+            output_path = self.output_dir / f"{output_prefix}_{i:03d}.png"
+            success = self.render_fractal(params, str(output_path), width, height)
+            results.append(output_path if success else None)
+        return results
+
+    def mutate_parameters(self, params: Dict, mutation_rate: float = 0.3) -> Dict:
+        """Create mutated parameters for evolution."""
+        mutated = params.copy()
+
+        for key in mutated:
+            if random.random() < mutation_rate:
+                if key == "formula":
+                    mutated[key] = random.choice([9, 10, 11, 12, 13])
+                elif key == "power":
+                    mutated[key] = max(2.0, min(16.0, mutated[key] * random.uniform(0.7, 1.4)))
+                elif key == "detail_level":
+                    mutated[key] = max(0.5, min(2.5, mutated[key] * random.uniform(0.8, 1.2)))
+                elif key.startswith("camera_"):
+                    mutated[key] = mutated[key] * random.uniform(0.8, 1.2)
+                elif key.startswith("color_"):
+                    mutated[key] = max(50, min(255, mutated[key] + random.randint(-30, 30)))
+
+        return mutated
