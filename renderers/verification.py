@@ -3,6 +3,10 @@
 Fractal Rendering Verification System
 =====================================
 
+Model: minimax-m2.5 (opencode)
+Created: 2026-02-16
+Version: 1.0
+
 This module provides automated verification that fractal renders are:
 1. Successful (file created)
 2. Valid (proper image format, not corrupted)

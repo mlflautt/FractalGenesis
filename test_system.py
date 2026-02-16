@@ -3,6 +3,10 @@
 Comprehensive Fractal System Test & Verification
 =================================================
 
+Model: minimax-m2.5 (opencode)
+Created: 2026-02-16
+Version: 1.0
+
 Tests all fractal renderers and verifies output quality.
 This script ensures the fractal generation system is working correctly.
 

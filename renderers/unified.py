@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
 Unified Fractal Renderer Interface
-===================================
+==================================
+
+Model: minimax-m2.5 (opencode)
+Created: 2026-02-16
+Version: 1.0
 
 Provides a consistent API across all fractal rendering backends:
 - Python 3D native renderer (no external dependencies)
