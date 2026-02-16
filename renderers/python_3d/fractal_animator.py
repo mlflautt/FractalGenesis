@@ -35,6 +35,7 @@ class FractalParams:
     folding_limit: float = 1.0
     folding_value: float = 2.0
     scale: float = -1.5
+    min_r: float = 0.5
     
     # Camera parameters
     camera_pos: Tuple[float, float, float] = (0.0, 0.0, -3.0)
@@ -108,7 +109,35 @@ class FractalPresets:
                 power=8.0,
                 camera_pos=(4.0, 0.0, 0.0),
                 color_palette="rainbow"
-            )
+            ),
+            
+            # Mandelbox presets
+            "mandelbox_classic": FractalParams(
+                fractal_type="mandelbox",
+                scale=2.0,
+                min_r=0.5,
+                camera_pos=(0.0, 0.0, -3.0),
+                coloring_mode="orbit_trap",
+                color_palette="cool"
+            ),
+            
+            "mandelbox_negative": FractalParams(
+                fractal_type="mandelbox",
+                scale=-1.5,
+                min_r=0.5,
+                camera_pos=(0.0, 0.0, -2.5),
+                coloring_mode="distance",
+                color_palette="fire"
+            ),
+            
+            # Burning ship preset
+            "burning_ship": FractalParams(
+                fractal_type="burning_ship",
+                power=8.0,
+                camera_pos=(0.0, 0.0, -3.0),
+                coloring_mode="orbit_trap",
+                color_palette="rainbow"
+            ),
         }
         
         return presets.get(name, presets["classic_mandelbulb"])
@@ -181,13 +210,107 @@ def julia_set_de(x, y, z, power, max_iter, bailout, cx, cy, cz):
     
     return 0.5 * np.log(r) * r / dr, orbit_trap, i
 
+max_r2 = 4.0
+
 @jit(nopython=True, fastmath=True)
-def get_distance_and_info(x, y, z, fractal_type, power, max_iter, bailout, julia_c):
+def mandelbox_de(x, y, z, scale, fold_limit, min_r, max_iter, bailout):
+    """Distance estimation for Mandelbox fractal"""
+    xx, yy, zz = x, y, z
+    orbit_trap = 1000.0
+    mr2 = min_r * min_r
+    dr = 1.0
+    
+    for i in range(max_iter):
+        # Box folding
+        if xx > 1.0:
+            xx = 2.0 - xx
+        elif xx < -1.0:
+            xx = -2.0 - xx
+        if yy > 1.0:
+            yy = 2.0 - yy
+        elif yy < -1.0:
+            yy = -2.0 - yy
+        if zz > 1.0:
+            zz = 2.0 - zz
+        elif zz < -1.0:
+            zz = -2.0 - zz
+            
+        # Sphere folding
+        r2 = xx*xx + yy*yy + zz*zz
+        if r2 < mr2:
+            temp = max_r2 / mr2
+            xx *= temp
+            yy *= temp
+            zz *= temp
+            dr *= temp
+        elif r2 < max_r2:
+            temp = max_r2 / r2
+            xx *= temp
+            yy *= temp
+            zz *= temp
+            dr *= temp
+        
+        # Scale and translate
+        xx = scale * xx + x
+        yy = scale * yy + y
+        zz = scale * zz + z
+        
+        r = np.sqrt(xx*xx + yy*yy + zz*zz)
+        orbit_trap = min(orbit_trap, r)
+        
+        if r > bailout:
+            break
+    
+    return 0.5 * np.log(r) * r / dr, orbit_trap, i
+
+@jit(nopython=True, fastmath=True)
+def burning_ship_de(x, y, z, power, max_iter, bailout):
+    """Distance estimation for 3D Burning Ship fractal"""
+    xx, yy, zz = x, y, z
+    dr = 1.0
+    r = np.sqrt(xx*xx + yy*yy + zz*zz)
+    orbit_trap = 1000.0
+    
+    for i in range(max_iter):
+        if r > bailout:
+            break
+            
+        orbit_trap = min(orbit_trap, r)
+        
+        # Burning ship uses absolute values
+        sx = -abs(xx)
+        sy = -abs(yy)
+        sz = -abs(zz)
+        
+        theta = np.arctan2(np.sqrt(sx*sx + sy*sy), sz)
+        phi = np.arctan2(sy, sx)
+        
+        zr = r ** (power - 1.0)
+        dr = zr * dr * power + 1.0
+        
+        zr = zr * r
+        theta = theta * power
+        phi = phi * power
+        
+        xx = zr * np.sin(theta) * np.cos(phi) + x
+        yy = zr * np.sin(theta) * np.sin(phi) + y
+        zz = zr * np.cos(theta) + z
+        
+        r = np.sqrt(xx*xx + yy*yy + zz*zz)
+    
+    return 0.5 * np.log(r) * r / dr, orbit_trap, i
+
+@jit(nopython=True, fastmath=True)
+def get_distance_and_info(x, y, z, fractal_type, power, max_iter, bailout, julia_c, scale, fold_limit, min_r):
     """Dispatch function for different fractal types"""
     if fractal_type == 0:  # mandelbulb
         return mandelbulb_de(x, y, z, power, max_iter, bailout)
     elif fractal_type == 1:  # julia
         return julia_set_de(x, y, z, power, max_iter, bailout, julia_c[0], julia_c[1], julia_c[2])
+    elif fractal_type == 2:  # mandelbox
+        return mandelbox_de(x, y, z, scale, fold_limit, min_r, max_iter, bailout)
+    elif fractal_type == 3:  # burning ship
+        return burning_ship_de(x, y, z, power, max_iter, bailout)
     else:
         return mandelbulb_de(x, y, z, power, max_iter, bailout)
 
@@ -272,6 +395,11 @@ def render_fractal_fast(image, width, height, params_array):
     # Fractal specific
     julia_c = (params_array[29], params_array[30], params_array[31])
     
+    # Mandelbox parameters (for all fractal types - defaults if not used)
+    scale = params_array[32] if len(params_array) > 32 else -1.5
+    folding_limit = params_array[33] if len(params_array) > 33 else 1.0
+    min_r = params_array[34] if len(params_array) > 34 else 0.5
+    
     # Set up camera coordinate system
     camera_pos = np.array([cam_x, cam_y, cam_z])
     target = np.array([target_x, target_y, target_z])
@@ -314,7 +442,7 @@ def render_fractal_fast(image, width, height, params_array):
             for step in range(max_steps):
                 pos = camera_pos + t * ray_dir
                 dist, trap, iters = get_distance_and_info(
-                    pos[0], pos[1], pos[2], fractal_type, power, iterations, bailout, julia_c
+                    pos[0], pos[1], pos[2], fractal_type, power, iterations, bailout, julia_c, scale, folding_limit, min_r
                 )
                 
                 orbit_trap = min(orbit_trap, trap)
@@ -335,19 +463,19 @@ def render_fractal_fast(image, width, height, params_array):
                 eps = 0.001
                 normal = np.array([
                     get_distance_and_info(final_pos[0] + eps, final_pos[1], final_pos[2], 
-                                        fractal_type, power, iterations, bailout, julia_c)[0] - 
+                                        fractal_type, power, iterations, bailout, julia_c, scale, folding_limit, min_r)[0] - 
                     get_distance_and_info(final_pos[0] - eps, final_pos[1], final_pos[2], 
-                                        fractal_type, power, iterations, bailout, julia_c)[0],
+                                        fractal_type, power, iterations, bailout, julia_c, scale, folding_limit, min_r)[0],
                     
                     get_distance_and_info(final_pos[0], final_pos[1] + eps, final_pos[2], 
-                                        fractal_type, power, iterations, bailout, julia_c)[0] - 
+                                        fractal_type, power, iterations, bailout, julia_c, scale, folding_limit, min_r)[0] - 
                     get_distance_and_info(final_pos[0], final_pos[1] - eps, final_pos[2], 
-                                        fractal_type, power, iterations, bailout, julia_c)[0],
+                                        fractal_type, power, iterations, bailout, julia_c, scale, folding_limit, min_r)[0],
                                         
                     get_distance_and_info(final_pos[0], final_pos[1], final_pos[2] + eps, 
-                                        fractal_type, power, iterations, bailout, julia_c)[0] - 
+                                        fractal_type, power, iterations, bailout, julia_c, scale, folding_limit, min_r)[0] - 
                     get_distance_and_info(final_pos[0], final_pos[1], final_pos[2] - eps, 
-                                        fractal_type, power, iterations, bailout, julia_c)[0]
+                                        fractal_type, power, iterations, bailout, julia_c, scale, folding_limit, min_r)[0]
                 ])
                 
                 normal_length = np.linalg.norm(normal)
@@ -411,7 +539,9 @@ class FractalRenderer:
     def __init__(self):
         self.fractal_type_map = {
             "mandelbulb": 0,
-            "julia": 1
+            "julia": 1,
+            "mandelbox": 2,
+            "burning_ship": 3
         }
         
         self.coloring_mode_map = {
