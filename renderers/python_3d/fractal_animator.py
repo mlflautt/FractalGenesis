@@ -37,6 +37,16 @@ class FractalParams:
     scale: float = -1.5
     min_r: float = 0.5
     
+    # IFS/KIFS specific
+    ifs_scale: float = 2.0
+    ifs_rot_x: float = 0.0
+    ifs_rot_y: float = 0.0
+    ifs_rot_z: float = 0.0
+    ifs_folds: int = 3
+    
+    # Lambda Mandelbulb
+    lambda_val: float = 1.0
+    
     # Camera parameters
     camera_pos: Tuple[float, float, float] = (0.0, 0.0, -3.0)
     target: Tuple[float, float, float] = (0.0, 0.0, 0.0)
@@ -300,8 +310,157 @@ def burning_ship_de(x, y, z, power, max_iter, bailout):
     
     return 0.5 * np.log(r) * r / dr, orbit_trap, i
 
+max_r2_ifs = 4.0
+
 @jit(nopython=True, fastmath=True)
-def get_distance_and_info(x, y, z, fractal_type, power, max_iter, bailout, julia_c, scale, fold_limit, min_r):
+def kifs_de(x, y, z, scale, folds, max_iter, bailout):
+    """Kaleidoscopic IFS distance estimation."""
+    xx, yy, zz = x, y, z
+    dr = 1.0
+    r = np.sqrt(xx*xx + yy*yy + zz*zz)
+    orbit_trap = 1000.0
+    
+    for i in range(max_iter):
+        if r > bailout:
+            break
+        orbit_trap = min(orbit_trap, r)
+        
+        # Basic KIFS folding
+        if folds >= 3:
+            if xx + yy < 0:
+                xx, yy = -yy, -xx
+            if xx - yy < 0:
+                tx, ty = xx, yy
+                xx = ty
+                yy = tx
+        if folds >= 4:
+            if yy + zz < 0:
+                yy, zz = -zz, -yy
+            if xx + zz < 0:
+                tx, tz = xx, zz
+                xx = tz
+                zz = tx
+        
+        # Scale
+        xx = scale * xx + x
+        yy = scale * yy + y
+        zz = scale * zz + z
+        
+        dr *= abs(scale)
+        r = np.sqrt(xx*xx + yy*yy + zz*zz)
+    
+    return 0.5 * np.log(r + 0.001) * r / abs(dr + 0.001), orbit_trap, i
+
+
+@jit(nopython=True, fastmath=True)
+def lambda_mandelbulb_de(x, y, z, power, lambda_val, cx, cy, cz, max_iter, bailout):
+    """Lambdabulb - modified formula z -> lambda*(z - z^n) + c."""
+    xx, yy, zz = x, y, z
+    dr = 1.0
+    r = np.sqrt(xx*xx + yy*yy + zz*zz)
+    orbit_trap = 1000.0
+    
+    for i in range(max_iter):
+        if r > bailout:
+            break
+        orbit_trap = min(orbit_trap, r)
+        
+        # z^n
+        theta = np.arctan2(np.sqrt(xx*xx + yy*yy), zz)
+        phi = np.arctan2(yy, xx)
+        zr = r ** (power - 1.0)
+        zr_n = zr * r
+        theta_n = theta * power
+        phi_n = phi * power
+        
+        znx = zr_n * np.sin(theta_n) * np.cos(phi_n)
+        zny = zr_n * np.sin(theta_n) * np.sin(phi_n)
+        znz = zr_n * np.cos(theta_n)
+        
+        # z -> lambda * (z - z^n) + c
+        xx = lambda_val * (xx - znx) + cx
+        yy = lambda_val * (yy - zny) + cy
+        zz = lambda_val * (zz - znz) + cz
+        
+        dr = abs(lambda_val) * dr * power + 1.0
+        r = np.sqrt(xx*xx + yy*yy + zz*zz)
+    
+    return 0.5 * np.log(r + 0.001) * r / abs(dr + 0.001), orbit_trap, i
+
+
+@jit(nopython=True, fastmath=True)
+def sphere_fold_de(x, y, z, scale, min_r, max_r_val, max_iter, bailout):
+    """Pure sphere folding (no box fold)."""
+    xx, yy, zz = x, y, z
+    mr2 = min_r * min_r
+    Mr2 = max_r_val * max_r_val
+    dr = 1.0
+    orbit_trap = 1000.0
+    
+    for i in range(max_iter):
+        r2 = xx*xx + yy*yy + zz*zz
+        
+        if r2 < mr2:
+            temp = Mr2 / mr2
+            xx *= temp
+            yy *= temp
+            zz *= temp
+            dr *= temp
+        elif r2 < Mr2:
+            temp = Mr2 / r2
+            xx *= temp
+            yy *= temp
+            zz *= temp
+            dr *= temp
+        
+        xx = scale * xx + x
+        yy = scale * yy + y
+        zz = scale * zz + z
+        
+        r = np.sqrt(xx*xx + yy*yy + zz*zz)
+        orbit_trap = min(orbit_trap, r)
+        
+        if r > bailout:
+            break
+    
+    return 0.5 * np.log(r + 0.001) * r / abs(dr), orbit_trap, i
+
+
+@jit(nopython=True, fastmath=True)
+def tricorn_de(x, y, z, power, max_iter, bailout):
+    """Tricorn/Mandelbar - y coordinate negated."""
+    xx, yy, zz = x, y, z
+    dr = 1.0
+    r = np.sqrt(xx*xx + yy*yy + zz*zz)
+    orbit_trap = 1000.0
+    
+    for i in range(max_iter):
+        if r > bailout:
+            break
+        orbit_trap = min(orbit_trap, r)
+        
+        # Use -abs on one coordinate like tricorn
+        sy = -abs(yy)
+        
+        theta = np.arctan2(np.sqrt(xx*xx + sy*sy), zz)
+        phi = np.arctan2(sy, xx)
+        zr = r ** (power - 1.0)
+        dr = zr * dr * power + 1.0
+        zr = zr * r
+        theta = theta * power
+        phi = phi * power
+        
+        xx = zr * np.sin(theta) * np.cos(phi) + x
+        yy = zr * np.sin(theta) * np.sin(phi) + y
+        zz = zr * np.cos(theta) + z
+        r = np.sqrt(xx*xx + yy*yy + zz*zz)
+    
+    return 0.5 * np.log(r) * r / dr, orbit_trap, i
+
+
+@jit(nopython=True, fastmath=True)
+def get_distance_and_info(x, y, z, fractal_type, power, max_iter, bailout, julia_c, scale, fold_limit, min_r,
+                          ifs_scale=2.0, ifs_folds=3, lambda_val=1.0):
     """Dispatch function for different fractal types"""
     if fractal_type == 0:  # mandelbulb
         return mandelbulb_de(x, y, z, power, max_iter, bailout)
@@ -311,6 +470,14 @@ def get_distance_and_info(x, y, z, fractal_type, power, max_iter, bailout, julia
         return mandelbox_de(x, y, z, scale, fold_limit, min_r, max_iter, bailout)
     elif fractal_type == 3:  # burning ship
         return burning_ship_de(x, y, z, power, max_iter, bailout)
+    elif fractal_type == 4:  # KIFS
+        return kifs_de(x, y, z, ifs_scale, ifs_folds, max_iter, bailout)
+    elif fractal_type == 5:  # lambda mandelbulb
+        return lambda_mandelbulb_de(x, y, z, power, lambda_val, x, y, z, max_iter, bailout)
+    elif fractal_type == 6:  # sphere fold
+        return sphere_fold_de(x, y, z, scale, min_r, 2.0, max_iter, bailout)
+    elif fractal_type == 7:  # tricorn
+        return tricorn_de(x, y, z, power, max_iter, bailout)
     else:
         return mandelbulb_de(x, y, z, power, max_iter, bailout)
 
@@ -395,10 +562,15 @@ def render_fractal_fast(image, width, height, params_array):
     # Fractal specific
     julia_c = (params_array[29], params_array[30], params_array[31])
     
-    # Mandelbox parameters (for all fractal types - defaults if not used)
+    # Mandelbox parameters
     scale = params_array[32] if len(params_array) > 32 else -1.5
     folding_limit = params_array[33] if len(params_array) > 33 else 1.0
     min_r = params_array[34] if len(params_array) > 34 else 0.5
+    
+    # IFS parameters (indices 35, 36, 37)
+    ifs_scale = params_array[35] if len(params_array) > 35 else 2.0
+    ifs_folds = int(params_array[36]) if len(params_array) > 36 else 3
+    lambda_val = params_array[37] if len(params_array) > 37 else 1.0
     
     # Set up camera coordinate system
     camera_pos = np.array([cam_x, cam_y, cam_z])
@@ -442,7 +614,8 @@ def render_fractal_fast(image, width, height, params_array):
             for step in range(max_steps):
                 pos = camera_pos + t * ray_dir
                 dist, trap, iters = get_distance_and_info(
-                    pos[0], pos[1], pos[2], fractal_type, power, iterations, bailout, julia_c, scale, folding_limit, min_r
+                    pos[0], pos[1], pos[2], fractal_type, power, iterations, bailout, julia_c, 
+                    scale, folding_limit, min_r, ifs_scale, ifs_folds, lambda_val
                 )
                 
                 orbit_trap = min(orbit_trap, trap)
@@ -463,19 +636,25 @@ def render_fractal_fast(image, width, height, params_array):
                 eps = 0.001
                 normal = np.array([
                     get_distance_and_info(final_pos[0] + eps, final_pos[1], final_pos[2], 
-                                        fractal_type, power, iterations, bailout, julia_c, scale, folding_limit, min_r)[0] - 
+                                        fractal_type, power, iterations, bailout, julia_c, 
+                                        scale, folding_limit, min_r, ifs_scale, ifs_folds, lambda_val)[0] - 
                     get_distance_and_info(final_pos[0] - eps, final_pos[1], final_pos[2], 
-                                        fractal_type, power, iterations, bailout, julia_c, scale, folding_limit, min_r)[0],
+                                        fractal_type, power, iterations, bailout, julia_c, 
+                                        scale, folding_limit, min_r, ifs_scale, ifs_folds, lambda_val)[0],
                     
                     get_distance_and_info(final_pos[0], final_pos[1] + eps, final_pos[2], 
-                                        fractal_type, power, iterations, bailout, julia_c, scale, folding_limit, min_r)[0] - 
+                                        fractal_type, power, iterations, bailout, julia_c, 
+                                        scale, folding_limit, min_r, ifs_scale, ifs_folds, lambda_val)[0] - 
                     get_distance_and_info(final_pos[0], final_pos[1] - eps, final_pos[2], 
-                                        fractal_type, power, iterations, bailout, julia_c, scale, folding_limit, min_r)[0],
+                                        fractal_type, power, iterations, bailout, julia_c, 
+                                        scale, folding_limit, min_r, ifs_scale, ifs_folds, lambda_val)[0],
                                         
                     get_distance_and_info(final_pos[0], final_pos[1], final_pos[2] + eps, 
-                                        fractal_type, power, iterations, bailout, julia_c, scale, folding_limit, min_r)[0] - 
+                                        fractal_type, power, iterations, bailout, julia_c, 
+                                        scale, folding_limit, min_r, ifs_scale, ifs_folds, lambda_val)[0] - 
                     get_distance_and_info(final_pos[0], final_pos[1], final_pos[2] - eps, 
-                                        fractal_type, power, iterations, bailout, julia_c, scale, folding_limit, min_r)[0]
+                                        fractal_type, power, iterations, bailout, julia_c, 
+                                        scale, folding_limit, min_r, ifs_scale, ifs_folds, lambda_val)[0]
                 ])
                 
                 normal_length = np.linalg.norm(normal)
@@ -541,7 +720,11 @@ class FractalRenderer:
             "mandelbulb": 0,
             "julia": 1,
             "mandelbox": 2,
-            "burning_ship": 3
+            "burning_ship": 3,
+            "kifs": 4,
+            "lambda_mandelbulb": 5,
+            "sphere_fold": 6,
+            "tricorn": 7,
         }
         
         self.coloring_mode_map = {
@@ -594,7 +777,17 @@ class FractalRenderer:
             params.roughness,
             
             # Julia set parameters
-            params.julia_c[0], params.julia_c[1], params.julia_c[2]
+            params.julia_c[0], params.julia_c[1], params.julia_c[2],
+            
+            # Mandelbox parameters
+            params.scale,
+            params.folding_limit,
+            params.min_r,
+            
+            # IFS parameters
+            params.ifs_scale,
+            params.ifs_folds,
+            params.lambda_val,
         ], dtype=np.float64)
     
     def render(self, params: FractalParams) -> Tuple[np.ndarray, Dict]:
