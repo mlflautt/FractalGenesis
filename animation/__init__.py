@@ -4,15 +4,17 @@ Animation Package
 
 Model: minimax-m2.5 (opencode)
 Created: 2026-02-16
+Version: 1.1
 
 Advanced animation system for FractalGenesis with:
 - Procedural generators (orbits, formula evolution, colors)
 - Animation presets & templates
 - Keyframe interpolation
-- GIF/video export
+- GIF/Video export
 
 Usage:
     from animation import FractalAnimator
+    from animation.video_export import create_video
     from animation.procedural_generators import OrbitGenerator
     from animation.presets import AnimationPresets
 """
@@ -31,6 +33,16 @@ from .presets import (
     PresetApplicator,
     save_preset,
     load_preset
+)
+
+from .video_export import (
+    create_video,
+    create_video_from_frames,
+    create_video_with_audio,
+    create_gif_with_ffmpeg,
+    get_video_info,
+    quick_video,
+    check_ffmpeg
 )
 
 # Simple animation controller - works with Python 3D renderer
@@ -115,6 +127,30 @@ class FractalAnimator:
             print(f"✓ Created GIF: {output_path}")
             return True
         return False
+    
+    def create_video(self, frame_paths: list, output_path: str, fps: int = 30) -> bool:
+        """Create MP4 video from frames."""
+        from .video_export import create_video_from_frames
+        return create_video_from_frames(frame_paths, output_path, fps)
+    
+    def animate_power_morph(self, power_start: float = 4.0, power_end: float = 16.0,
+                            num_frames: int = 30, output_dir: str = "output/animation",
+                            fractal_type: str = "mandelbulb", width: int = 400, height: int = 400,
+                            create_video: bool = False) -> list:
+        """Create power morph animation with optional video export."""
+        frames = self.animate(
+            {"fractal_type": fractal_type, "power": power_start, "camera_pos": (0, 0, -3), 
+             "color_palette": "warm", "width": width, "height": height},
+            {"fractal_type": fractal_type, "power": power_end, "camera_pos": (0, 0, -3),
+             "color_palette": "fire", "width": width, "height": height},
+            num_frames, output_dir, f"power_{power_start}_to_{power_end}", width, height
+        )
+        
+        if create_video:
+            video_path = output_dir + "/power_morph.mp4"
+            self.create_video(frames, video_path, fps=10)
+        
+        return frames
 
 
 __all__ = [
@@ -133,7 +169,16 @@ __all__ = [
     'AnimationPresets',
     'PresetApplicator',
     'save_preset',
-    'load_preset'
+    'load_preset',
+    
+    # Video Export
+    'create_video',
+    'create_video_from_frames',
+    'create_video_with_audio',
+    'create_gif_with_ffmpeg',
+    'get_video_info',
+    'quick_video',
+    'check_ffmpeg'
 ]
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"

@@ -1,0 +1,247 @@
+﻿Architectural Paradigms and Computational Foundations for Next-Generation Fractal Rendering in Linux and macOS Environments
+The evolution of fractal geometry from a theoretical mathematical curiosity to a cornerstone of modern computational aesthetics represents a unique convergence of topology, numerical analysis, and high-performance graphics programming. The pursuit of a generalized function for complex shapes, initiated by Benoit Mandelbrot in 1979 during his research into Julia sets, laid the groundwork for an entire field of digital synthesis.1 Today, fractal generation software serves a dual purpose: the simulation of natural landscapes—modeling the inherent irregularity of mountains, coastlines, and rivers—and the creation of abstract mathematical art characterized by infinite self-similarity.1 For the modern developer, particularly those targeting the robust Fedora Linux and macOS ecosystems, the challenge lies in synthesizing traditional recursive algorithms with modern hardware acceleration APIs like Vulkan and Metal, while ensuring formula interchangeability across a fragmented software landscape.
+Mathematical Foundations of Volumetric and Escape-Time Fractals
+The transition from two-dimensional escape-time fractals to three-dimensional volumetric forms required a fundamental re-evaluation of complex number theory. While the classic Mandelbrot set is defined by the iterative function $z_{n+1} = z_n^2 + c$ on the complex plane, 3D representations often rely on hypercomplex numbers or spherical coordinate transformations to emulate the self-similarity found in 2D counterparts.1 This computer-based generation of fractal objects is effectively an endless process; while theoretically infinite, in practice, images are approximated to a specific level of detail dictated by computational constraints.1
+The Mandelbulb and Spherical Power Transformations
+The Mandelbulb, popularized by the work of Daniel White and Paul Nylander, utilizes an $n^{th}$-power transformation in spherical coordinates to circumvent the lack of a natural 3D extension of complex numbers. For a point in 3D space $(x, y, z)$, the transformation into the power $p$ involves determining the radius $r$, the polar angle $\theta$, and the azimuthal angle $\phi$.3 The iterative step is defined by determining the distance from the origin and the angular orientation of the vector:
+
+
+$$r = \sqrt{x^2 + y^2 + z^2}$$
+
+
+$$\theta = \arctan\left(\frac{\sqrt{x^2 + y^2}}{z}\right)$$
+
+
+$$\phi = \arctan\left(\frac{y}{x}\right)$$
+The new coordinates after one iteration, elevated to power $p$, are calculated as follows:
+
+
+$$x_{new} = r^p \cdot \sin(\theta \cdot p) \cdot \cos(\phi \cdot p) + x_0$$
+
+
+$$y_{new} = r^p \cdot \sin(\theta \cdot p) \cdot \sin(\phi \cdot p) + y_0$$
+
+
+$$z_{new} = r^p \cdot \cos(\theta \cdot p) + z_0$$
+Higher powers, such as power 8, are frequently used in artistic rendering because they exhibit more intricate fractal detail than power 2, which often appears lack-luster or lacks the self-similar complexity expected of the Mandelbrot family.3 Some implementations optimize this by squaring the radius and rotating by twice the angle, though the power-8 variant remains the community standard for visual quality.3
+The Mandelbox and Folding Dynamics
+In contrast to the spherical expansion of the Mandelbulb, the Mandelbox relies on a series of folding and scaling transformations. This class of fractal is characterized by its "box-like" structure and is generated using a combination of "box fold" and "sphere fold" operations. These operations introduce discontinuities and sharp edges, creating a starkly different aesthetic compared to the organic curves of the Mandelbulb.2 Software like Fragmentarium and Mandelbulber facilitate the exploration of these forms by hybridizing up to six different fractal formulas, allowing for the creation of "BulbBox" hybrids that merge the organic and the geometric.2
+Fractal Flames and Stochastic Iterated Function Systems
+Fractal Flames represent a significant extension of Iterated Function Systems (IFS), pioneered by Scott Draves in 1992.8 Unlike escape-time fractals, which determine set membership based on whether an iterative sequence diverges, Fractal Flames use a stochastic "Chaos Game" to build a density histogram of visited points.8 The algorithm is distinguished from traditional IFS by three core innovations: non-linear variations, log-density display mapping (a form of tone mapping), and structural coloring.8
+A Fractal Flame is composed of a collection of functions $F_i$, each associated with a weight or probability $P_i$. The general transformation involves composing non-linear functions, termed "variations," with standard affine transforms.9 Common variations include:
+Variation ID
+	Name
+	Formula Representation
+	$V_0$
+	Linear
+	$(x, y)$
+	$V_1$
+	Sinusoidal
+	$(\sin x, \sin y)$
+	$V_2$
+	Spherical
+	$(x, y) / (x^2 + y^2)$
+	$V_3$
+	Swirl
+	$(x \sin(r^2) - y \cos(r^2), x \cos(r^2) + y \sin(r^2))$
+	The flame algorithm operates like a Monte Carlo simulation, where image quality is directly proportional to the number of iterations or samples per pixel.8 Log-density display allows the renderer to reveal delicate, high-frequency structures that would otherwise be obscured in a linear color space.8
+Advanced Rendering Algorithms: Ray Marching and Numerical Precision
+The visualization of three-dimensional fractals and the exploration of deep 2D zooms require sophisticated algorithms that manage the immense computational load and the limits of machine precision.
+Ray Marching with Distance Estimators
+Rendering volumetric fractals such as the Mandelbulb or Mandelbox typically employs ray marching combined with Signed Distance Functions (SDFs). Instead of traditional polygon rasterization, which is ill-suited for the infinite complexity of fractal surfaces, the renderer casts a ray from the camera for each pixel and "marches" along the ray in steps determined by a distance estimator (DE).3 The distance estimator provides a mathematically rigorous lower bound on the distance to the nearest point on the fractal surface, ensuring the ray does not "step through" the boundary.3
+The distance estimate for the Mandelbrot set and its derivatives is derived from the work of Douady and Hubbard, typically calculated as:
+
+
+$$DE = 0.5 \cdot \ln(r) \cdot \frac{r}{dr}$$
+where $r$ is the magnitude of the escape-time sequence and $dr$ is the magnitude of the running derivative of the fractal function.4 This approach allows for the implementation of advanced lighting effects such as depth-of-field, specularity, and ambient occlusion, as the surface normal can be approximated by sampling the DE at nearby points in space.3
+Deep Zooming and Perturbation Theory
+For deep exploration of 2D sets, standard 64-bit double-precision floating-point numbers fail after approximately $10^{15}$ zoom levels, resulting in "pixelation" and loss of detail.13 To reach depths of $10^{5000}$ or beyond, modern renderers like Kalles Fraktaler 2+ and Fraktaler 3 utilize Perturbation Theory.13
+The core of this technique involves calculating a single "reference orbit" at extremely high precision—often hundreds or thousands of bits—using libraries like MPFR or GMP.15 The orbits of all other pixels in the image are then calculated as small "deltas" or perturbations from this reference.13 The perturbed iteration is defined by the following expansion:
+
+
+$$z_{n+1} = (Z_n + \Delta z_n)^2 + (C + \Delta c)$$
+
+
+$$\Delta z_{n+1} = 2 Z_n \Delta z_n + \Delta z_n^2 + \Delta c$$
+By iterating only the $\Delta z$ value at standard machine precision (32-bit or 64-bit), the renderer achieves massive speedups—often 100 times faster than high-precision alternatives—while maintaining total accuracy at extreme depths.13
+Bilinear Approximation (BLA) and Iteration Skipping
+Bivariate Linear Approximation (BLA) further accelerates deep zooms by approximating multiple iterations of the perturbation equation with a linear model. This is most useful for deep zooming tasks that require dwell limits in the millions.19 The BLA model approximates the evolution of the delta over $l$ iterations using coefficients $A_l$ and $B_l$:
+
+
+$$\Delta z_{n+l} = A_l \Delta z_n + B_l \Delta c$$
+Renderers maintain a hierarchy of BLA "levels" and check a "validity radius" to determine if a skip can be safely performed without introducing glitches.16 If the squared term $\Delta z_n^2$ in the perturbation equation is sufficiently small, it has no effect on the result, allowing the renderer to safely bypass the standard iterative path.20
+Comparative Analysis of Fractal Software Ecosystems
+The current landscape of fractal software is characterized by a high degree of specialization, with programs often excelling in one specific fractal family or rendering method.
+Software
+	Primary Focus
+	Platform Support
+	Algorithm
+	Mandelbulb3D
+	3D Volumetric
+	Windows (Wine on Linux/Mac)
+	Ray Marching, DE
+	Mandelbulber
+	3D Volumetric
+	Linux, macOS, Windows
+	Ray Marching, OpenCL
+	JWildfire
+	Fractal Flames
+	Linux, macOS, Windows
+	Chaos Game (Java)
+	Apophysis
+	Fractal Flames
+	Windows
+	Chaos Game (Delphi)
+	Kalles Fraktaler
+	2D Deep Zoom
+	Windows (Wine on Linux)
+	Perturbation, BLA
+	Fraktaler 3
+	2D Deep Zoom
+	Linux, macOS, Android
+	Perturbation, OpenCL
+	Ultra Fractal
+	2D Layered Art
+	macOS, Windows
+	Multi-layer, CPU
+	FractalNow
+	General 2D
+	Linux, macOS, Windows
+	Multi-threaded, Heuristics
+	Mandelbulb3D (MB3D) and Mandelbulber
+Mandelbulb3D remains a cornerstone of the 3D fractal community due to its extensive library of hybrid formulas and its sophisticated lighting environment, which includes effects like specularity, depth-of-field, and glow.12 However, MB3D is a 32-bit Windows application, which limits its RAM usage to 4GB and necessitates the use of Wine or Parallels for Linux and macOS users.12 Mandelbulber, conversely, is a native cross-platform application that supports OpenCL acceleration on both CPU and GPU devices.1 While Mandelbulber is technically more modern, MB3D’s devoted following continues to share formula packs (such as the 2026 non-JIT pack) that provide "native-like" performance for new topological forms.22
+JWildfire and the Fractal Flame Pipeline
+JWildfire is the preeminent open-source fractal flame generator. Being Java-based, it offers native compatibility across Linux Fedora, macOS, and Windows.2 JWildfire is known for its sophisticated flame fractal generator and its user-friendly interface, which allows for the creation of complex "glitch flames" and animating digital landscapes.2 Recent updates, such as JWildfire 9.00, have introduced JWildfireSwan as a GPU backend, significantly improving rendering times compared to traditional CPU-only Java implementations.2
+Kalles Fraktaler and the Evolution of Deep Zooming
+Kalles Fraktaler 2+ (KF) is the definitive tool for deep Mandelbrot exploration on Windows, utilizing perturbation and series approximation to achieve zooms that were previously computationally impossible.13 On Linux, KF can be run via Wine, but developers have noted bugs such as crashes when zooming past $1e291$ in certain fractals.13 Fraktaler 3 represents a modern, natively cross-platform alternative that uses an "opcode model" for formulas, allowing it to be mathematically robust and highly optimized for both CPU and OpenCL backends.16
+Software Interchangeability and Cross-Platform Compatibility
+Interchangeability between renderers is often hampered by inconsistent formula implementations and varying naming conventions for variables.
+Variation Mapping and Correction
+Fractorium, a high-performance flame renderer, addresses these inconsistencies by implementing a mapping layer that corrects for misspellings and naming collisions caused by the decentralized nature of Apophysis plugin development.27 This mapping ensures that parameters exported from one program yield consistent visual results in another.
+Variation Name (Apophysis)
+	Mapped Name (Fractorium/Chaotica)
+	swtin_distort
+	stwin_distort
+	re_a, im_a
+	Mobius_Re_A, Mobius_Im_A
+	octa_x, octa_y
+	octagon_x, octagon_y
+	pre_blur
+	pre_gaussian_blur
+	bwraps7, bwraps2
+	bwraps
+	Furthermore, certain variations exhibit "contention" between renderers like Chaotica and Apophysis, where formulas have been reimplemented with different visual characteristics.27 Fractorium provides a "Flam3 Compatibility" toggle to allow users to switch between these rendering behaviors.27
+Linux Fedora and macOS Native Environments
+For the development of a new renderer on Linux Fedora, the ecosystem provides a cutting-edge foundation. Fedora’s rapid 6-month release cycle ensures access to the latest LLVM, Mesa drivers, and kernel improvements.28 Developers on Fedora can utilize dnf5 and Rawhide for early testing of graphics stack changes, though they must remain aware of infrastructure challenges such as shared library loading errors in the buildroot.30
+On macOS, the transition to Apple Silicon (M1/M2/M3) has made the Metal API the primary target for high-performance graphics.31 Native macOS software like Frax and Ultra Fractal 6 have already implemented support for Apple Silicon, providing fast deep zooming and Retina/High DPI support.31 For a cross-platform renderer, targeting Metal on Mac while using Vulkan on Linux is the most robust path toward performance parity.
+Technical Requirements for a New Creative Renderer
+The design of a next-generation fractal renderer must prioritize low-level hardware access and numerical precision while maintaining a flexible formula architecture.
+Vulkan vs. OpenCL vs. CUDA
+The choice of compute API is a critical architectural decision. Vulkan is a modern, explicit graphics and compute API that provides fine control over resources and execution, making it ideal for the complex memory barriers required in ray marching.34 While OpenCL is hardware-agnostic and easier to implement for pure compute tasks, it is considered "dated" in some environments and lacks the tight integration with rendering pipelines that Vulkan offers.34
+Vulkan's advantage in fractal rendering stems from its ability to pre-record command buffers, reducing the CPU-to-GPU interaction overhead that often bottlenecks OpenCL 1.2 implementations.35 Furthermore, Vulkan's compute shaders often outperform OpenCL by approximately 10% in raw GPU runtime on modern hardware.35
+The Role of Rust and wgpu
+The Rust programming language has emerged as a preferred choice for new renderer development due to its memory safety and native-speed performance. The wgpu crate offers a cross-platform abstraction that runs natively on Vulkan (Linux), Metal (macOS), and DX12 (Windows).37 Projects like fractl and rust-fractal-core demonstrate the feasibility of this approach, implementing multi-threaded CPU loops via the rayon crate and GPU compute via wgpu.18
+Architecturally, a new renderer should leverage "wisdom" files—as seen in Fraktaler 3—to store hardware-specific benchmarks and metadata.16 This allows the software to automatically select the most efficient number type (e.g., long double, float128, or doubleexp) and device (CPU, GPU, or both) for a given zoom depth and hardware configuration.16
+Memory and Precision Constraints
+Fractal rendering is uniquely sensitive to memory architecture. While Mandelbulb3D is limited by its 32-bit architecture to 4GB of RAM, modern 64-bit renderers can utilize massive amounts of system memory for precomputing high-precision reference orbits.13 Precision limits remain a primary engineering hurdle:
+Precision Type
+	Bits
+	Zoom Depth Limit
+	Hardware Support
+	Single (f32)
+	32
+	~1e7
+	High (GPU)
+	Double (f64)
+	64
+	~1e15
+	High (CPU/GPU)
+	Quad (f128)
+	128
+	~1e30
+	Limited (CPU)
+	Arbitrary
+	Variable
+	$10^{646,000,000}$
+	CPU (MPFR/GMP)
+	Animation and Video Generation Systems
+Fractal animation requires a sophisticated temporal interpolation engine to handle the transition between complex mathematical states.
+Keyframing and Cubic Splines
+Keyframing in fractal software involves defining starting and ending points for a transition, between which the software interpolates values to create the illusion of movement.41 For 3D fractals, this includes interpolating camera coordinates, orientation, and specific formula parameters (e.g., the "power" of a Mandelbulb).41
+Artists typically use cubic splines—specifically Hermite interpolation—to ensure position and speed continuity.41 This prevents the "jumping" motion associated with linear interpolation and allows for smooth "ease-in" and "ease-out" transitions.41 For rotations, quaternions are used to provide stable and predictable spherical interpolation (SLERP), avoiding the mathematical instabilities of Euler angles.42
+Temporal Sampling and Rendering Pipelines
+High-resolution fractal animations are computationally expensive, with professional artists often rendering 2,500 frames for a single fly-through.21 To manage this, renderers must support tile-based rendering for high-resolution stills and progressive rendering for high-quality anti-aliasing.6 Modern pipelines often incorporate "Temporal Sampling" and "Box Counting" methods to estimate the fractal dimension of datasets and optimize the distribution of rendering tasks.45
+Animation Task
+	Implementation Method
+	Advantage
+	Path Interpolation
+	Cubic Hermite Splines
+	Smooth transitions, local control
+	Rotation
+	Quaternions (SLERP)
+	No gimbal lock, stable
+	Speed Control
+	Temporal Parameterization
+	Adjust velocity without changing path
+	Post-Processing
+	Frame Interpolation (DAIN/AE)
+	Reduces render time by 80%
+	Collaborative and Distributed Rendering
+Project-based renderers like Electric Sheep utilize collaborative, distributed computing to render and evolve fractal "sheep" across thousands of user machines.2 For a new Linux renderer, implementing a similar "render farm" capability—where multiple Fedora nodes can share the workload via a command-line interface—would provide the scalability required for professional VFX work.21
+Synthesis and Strategic Outlook for Linux Renderer Development
+The development of a new fractal renderer for Linux Fedora must address the historical limitations of existing tools while leveraging the modularity and hardware efficiency of modern systems.
+Addressing the Interoperability Gap
+The primary failure of current fractal ecosystems is the lack of formula portability. A new renderer should implement a JIT (Just-In-Time) compiler or a modular GLSL programming model that can interpret legacy formulas from Mandelbulb3D while allowing for the development of new, high-performance shaders.6 By using an "opcode model" for formula definition, the software can ensure mathematical robustness across different hardware backends.26
+Designing for Native Performance
+On Linux, the renderer should prioritize a Vulkan-based compute path to minimize CPU overhead and maximize throughput for ray marching.35 On macOS, a native Metal implementation is required to fully utilize the unified memory architecture of Apple Silicon.32 The use of Rust and wgpu provides a modern, safe, and efficient way to target these disparate APIs from a single codebase.38
+User-Centric Modular Architecture
+Finally, the renderer must focus on user workflow. Features like "Solid Guessing" and "Adaptive Anti-aliasing" (pioneered by FractalNow) can significantly speed up the rendering of 2D previews.46 For 3D work, a multi-tabbed IDE with real-time parameter manipulation and high-resolution tile rendering will provide the professional environment required by VFX artists.6
+The convergence of these technologies—Vulkan/Metal acceleration, perturbation-based deep zooming, and a modular, cross-platform formula engine—offers a roadmap for a new generation of fractal software. Such a tool would not only preserve the legacy of mathematical pioneers like Benoit Mandelbrot and Scott Draves but also provide a modern, high-performance platform for the future of digital aesthetic synthesis on Linux and macOS.
+Works cited
+1. Fractal-generating software - Wikipedia, accessed February 18, 2026, https://en.wikipedia.org/wiki/Fractal-generating_software
+2. Fractal Software, accessed February 18, 2026, https://fractalfoundation.org/resources/fractal-software/
+3. 3d - How is a mandelbulb rendered? - Stack Overflow, accessed February 18, 2026, https://stackoverflow.com/questions/39310271/how-is-a-mandelbulb-rendered
+4. 3D Fractal Generation, Mandelbulb - Processing Forum, accessed February 18, 2026, https://forum.processing.org/one/topic/3d-fractal-generation-mandelbulb.html
+5. Mandelbulbs Mandelbrot sets transformed into 3D - NVIDIA Developer Forums, accessed February 18, 2026, https://forums.developer.nvidia.com/t/mandelbulbs-mandelbrot-sets-transformed-into-3d/13280
+6. Fragmentarium - GitHub Pages, accessed February 18, 2026, https://syntopia.github.io/Fragmentarium/
+7. Mandelbulber Fractal Rendering Software, accessed February 18, 2026, https://www.mandelbulb.com/2012/3d-fractal-rendering-mandelbulber/
+8. Fractal flame - Wikipedia, accessed February 18, 2026, https://en.wikipedia.org/wiki/Fractal_flame
+9. The Fractal Flame Algorithm - FLAM3, accessed February 18, 2026, https://flam3.com/flame_draves.pdf
+10. Playing with fire: The fractal flame algorithm | The Old Speice Guy, accessed February 18, 2026, https://speice.io/2024/11/playing-with-fire/
+11. Mandelbulb | Syntopia - Mikael Hvidtfeldt Christensen, accessed February 18, 2026, http://blog.hvidtfeldts.net/index.php/category/mandelbulb/
+12. Mandelbulb 3D (MB3D) fractal generator / rendering software, accessed February 18, 2026, https://www.mandelbulb.com/2014/mandelbulb-3d-mb3d-fractal-rendering-software/
+13. smurfix/kf2: A fork of Kalle's Fractaler - GitHub, accessed February 18, 2026, https://github.com/smurfix/kf2
+14. BertrandBev/fractal: ♾️ A multithreaded fractal renderer in Rust - GitHub, accessed February 18, 2026, https://github.com/BertrandBev/fractal
+15. Kalles Fraktaler 2 + - mathr, accessed February 18, 2026, https://mathr.co.uk/kf/kf.html
+16. fraktaler-3-1.2, accessed February 18, 2026, https://fraktaler.mathr.co.uk/fraktaler-3-1.2.html
+17. Kalles Fraktaler 2 + Manual - mathr, accessed February 18, 2026, https://mathr.co.uk/kf/manual.html
+18. rust-fractal/rust-fractal-core: Mandelbrot fractal visualizer featuring perturbation based iteration methods, series approximation and multithreading. - GitHub, accessed February 18, 2026, https://github.com/rust-fractal/rust-fractal-core
+19. Bivariate Linear Approximation, Mu-Ency at MROB, accessed February 18, 2026, http://www.mrob.com/pub/muency/bivariatelinearapproximati.html
+20. Faster Mandelbrot Set Rendering with BLA: Bivariate Linear Approximation, accessed February 18, 2026, https://philthompson.me/2023/Faster-Mandelbrot-Set-Rendering-with-BLA-Bivariate-Linear-Approximation.html
+21. Hardware and Rendering for Mandelbulb3D — Julius Horsthuis, accessed February 18, 2026, http://www.julius-horsthuis.com/blog/2016/12/11/hardware-and-rendering-for-mandelbulb3d
+22. Mandelbulb 3D - Formula Pack 1 - 2026 - non JIT by Spiraldiver on ..., accessed February 18, 2026, https://www.deviantart.com/spiraldiver/art/Mandelbulb-3D-Formula-Pack-1-2026-non-JIT-1294618870
+23. Mandelbulb 3D and Fractal Forums - DeviantArt, accessed February 18, 2026, https://www.deviantart.com/mandelbulbers/journal/Mandelbulb-3D-and-Fractal-Forums-258663550
+24. Fractal Software & Tools | sk33lz, accessed February 18, 2026, https://sk33lz.com/fractals/software/
+25. Glitch Flames - Fractal Formulas, accessed February 18, 2026, https://fractalformulas.wordpress.com/2018/02/21/glitch-flames/
+26. fraktaler-3-3.1, accessed February 18, 2026, https://fraktaler.mathr.co.uk/
+27. Apophysis & Chaotica compatibility « Fractorium, accessed February 18, 2026, http://fractorium.com/?article=name-correction
+28. RoadMap - Fedora Project Wiki, accessed February 18, 2026, https://fedoraproject.org/wiki/RoadMap
+29. Fedora Linux 35 development schedule, accessed February 18, 2026, https://communityblog.fedoraproject.org/fedora-linux-35-development-schedule/
+30. Infrastructure & Release Engineering Summary 2024 - Fedora Discussion, accessed February 18, 2026, https://discussion.fedoraproject.org/t/infrastructure-release-engineering-summary-2024/142945
+31. ‎Fraⅹ App - App Store, accessed February 18, 2026, https://apps.apple.com/us/app/fra/id568827824
+32. Is there interest in supporting a Metal version of Cycles for MacOS? - Page 12, accessed February 18, 2026, https://devtalk.blender.org/t/is-there-interest-in-supporting-a-metal-version-of-cycles-for-macos/4475?page=12
+33. Ultra Fractal: Advanced Fractal Software for Windows and macOS, accessed February 18, 2026, https://www.ultrafractal.com/
+34. Choosing Vulkan, OpenCL, SYCL or CUDA for GPU Compute - TechnoLynx, accessed February 18, 2026, https://www.technolynx.com/post/choosing-vulkan-opencl-sycl-or-cuda-for-gpu-compute
+35. OpenCL vs. Vulkan Compute - Khronos Forums, accessed February 18, 2026, https://community.khronos.org/t/opencl-vs-vulkan-compute/7132
+36. Vulkan vs. OpenCL for GPGPU - Reddit, accessed February 18, 2026, https://www.reddit.com/r/vulkan/comments/11lklcx/vulkan_vs_opencl_for_gpgpu/
+37. gfx-rs/wgpu: A cross-platform, safe, pure-Rust graphics API. - GitHub, accessed February 18, 2026, https://github.com/gfx-rs/wgpu
+38. wgpu - Rust - Docs.rs, accessed February 18, 2026, https://docs.rs/wgpu/latest/wasm32-unknown-unknown/wgpu/
+39. Shapur1234/Fractl: Fractal renderer written in rust supporting multithreading, gpu compute and wasm - GitHub, accessed February 18, 2026, https://github.com/Shapur1234/Fractl
+40. rust-fractal - GitHub, accessed February 18, 2026, https://github.com/rust-fractal
+41. Animation Curves and Splines 1, accessed February 18, 2026, https://web.stanford.edu/class/cs248/pdf/class_04_animation_curves_and_splines_1.pdf
+42. Interactive Control of Interpolations for Animation and Modeling - Graphics Interface, accessed February 18, 2026, https://graphicsinterface.org/wp-content/uploads/gi1993-29.pdf
+43. bicubic keyframe interpolation - animation - Stack Overflow, accessed February 18, 2026, https://stackoverflow.com/questions/45640527/bicubic-keyframe-interpolation
+44. Didn't really understand the descriptions of the different keyframe interpolation modes, so I made this to help me visualize it : r/blender - Reddit, accessed February 18, 2026, https://www.reddit.com/r/blender/comments/12yrihm/didnt_really_understand_the_descriptions_of_the/
+45. wanglab-georgetown/fractal: Fractal Dimension Estimation Toolbox - GitHub, accessed February 18, 2026, https://github.com/wanglab-georgetown/fractal
+46. Fractalnow - A fast, advanced, multi-platform fractal generator., accessed February 18, 2026, https://fractalnow.sourceforge.io/
+47. 2D Mandelbrot set Turned into 3D using 3D complex : r/mathematics - Reddit, accessed February 18, 2026, https://www.reddit.com/r/mathematics/comments/u0te8y/2d_mandelbrot_set_turned_into_3d_using_3d_complex/
